@@ -142,7 +142,7 @@ namespace SEScript
                 isSelfCheckCompleted = false;
             }
 
-            CaptainSeat = GridTerminalSystem.GetBlockWithName("LTC_CaptainSeat") as IMyShipController;
+            CaptainSeat = GridTerminalSystem.GetBlockWithName("LTC_Controller") as IMyShipController;
             if (CaptainSeat == null)
             {
                 StatusCheck += ("Ophelia找不到舰长，请设置正确的控制台。\r\n");
