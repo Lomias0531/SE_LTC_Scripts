@@ -1,3 +1,4 @@
 \obj
 \.vs
-SEScript\obj\
+\Debug
+*.cache
