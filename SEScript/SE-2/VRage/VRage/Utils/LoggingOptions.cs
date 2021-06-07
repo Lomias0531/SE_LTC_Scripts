@@ -1,0 +1,24 @@
+using System;
+
+namespace VRage.Utils
+{
+	[Flags]
+	public enum LoggingOptions
+	{
+		NONE = 0x1,
+		ENUM_CHECKING = 0x2,
+		LOADING_MODELS = 0x4,
+		LOADING_TEXTURES = 0x8,
+		LOADING_CUSTOM_ASSETS = 0x10,
+		LOADING_SPRITE_VIDEO = 0x20,
+		VALIDATING_CUE_PARAMS = 0x40,
+		CONFIG_ACCESS = 0x80,
+		SIMPLE_NETWORKING = 0x100,
+		VOXEL_MAPS = 0x200,
+		MISC_RENDER_ASSETS = 0x400,
+		AUDIO = 0x800,
+		TRAILERS = 0x1000,
+		SESSION_SETTINGS = 0x2000,
+		ALL = 0x3FFF
+	}
+}

@@ -1,0 +1,11 @@
+namespace VRage.GameServices
+{
+	public enum MyChatMemberStateChangeEnum
+	{
+		Entered = 1,
+		Left = 2,
+		Disconnected = 4,
+		Kicked = 8,
+		Banned = 0x10
+	}
+}
