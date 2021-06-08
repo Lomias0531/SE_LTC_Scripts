@@ -64,10 +64,10 @@ namespace SEScript
         }
         void DisplayInfo()
         {
-            string info = "";
+            string info = "EEE";
             foreach (IMyMotorRotor item in LTC_Rot_Vertical)
             {
-                info += item.DisplayName + " - " + item.Position.ToString() + "\r\n";
+                info += item.DisplayName + " - " + item.Orientation.ToString() + "\r\n";
             }
             foreach (IMyThrust thu in LTC_Thrusters)
             {
