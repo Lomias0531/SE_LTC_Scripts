@@ -236,22 +236,23 @@ namespace SEScript
             {
                 "恢复手动驾驶",
             };
-            if(!isManualFlight)
+            if (!isManualFlight)
             {
 
-                if(CaptainSeat.MoveIndicator.X>0)
+                if (CaptainSeat.MoveIndicator.Z > 0)
                 {
 
                 }
-                if(CaptainSeat.MoveIndicator.X<0)
+                if (CaptainSeat.MoveIndicator.Z < 0)
                 {
 
                 }
-                if(CaptainSeat.MoveIndicator.Y>0)
+                if (CaptainSeat.MoveIndicator.Y > 0)
                 {
                     OpheliaMain.TryRun("ManualFlight|True");
                 }
-            }else
+            }
+            else
             {
                 displayUI = "手动飞行中";
             }
