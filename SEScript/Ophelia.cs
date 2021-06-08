@@ -12,10 +12,10 @@ namespace SEScript
         /*
          * Ophelia舰载人工智能 By LOMITECH
          * 2021/6/4
-         * 当前目标：显示舰船库存状况、电量、航速
-         * 间隔随机时间卖萌
+         * 当前目标：显示舰船库存状况、电量、航速 - 完成
+         * 间隔随机时间卖萌 - 完成
          * 2021/6/6
-         * 当前目标：分别显示舰船氧气、氢气储量
+         * 当前目标：分别显示舰船氧气、氢气储量 - 完成
          * 获取视野中目标
          * 多方块通信
          * UI控制与显示
@@ -31,6 +31,8 @@ namespace SEScript
         List<IMyTerminalBlock> InventoryBlocks; //库存方块
         List<IMyBatteryBlock> BatteryBlocks; //电池方块
         List<IMyGasTank> GasBlocks; //气罐方块
+        List<IMyGyro> Gyrospheres; //陀螺仪方块
+        IMyProgrammableBlock OpheliaMain; //主控程序块
 
         //--------------用户设定---------------------
         bool isSelfCheckCompleted = false; //自检是否完成
@@ -42,7 +44,9 @@ namespace SEScript
         PowerStatus curPowerStatus; //当前能量情况
         PowerStatus lastPowerStatus; //上次能量情况
 
-        float GasLevel; //气体情况
+        //float GasLevel; //气体情况
+        float HydrogenLevel; //氢气储量
+        float OxygenLevel; //氧气储量
 
         //List<MyDetectedEntityInfo> detectedTargets; //发现的目标
 
@@ -53,7 +57,7 @@ namespace SEScript
         OpheliaMood curMood; //当前心情
 
         //--------------UI控制---------------------
-        bool isPilot; //当前是否控制推进器
+        bool isManualFlight; //当前是否控制推进器
         Vector3 menuPos; //菜单选中位置
 
         enum PowerStatus
@@ -69,11 +73,6 @@ namespace SEScript
             Normal,
             Happy,
             Sad,
-        }
-        enum ControlStatus
-        {
-            ManualControl,
-            AutoPilot,
         }
 
         List<string> NormalDialogue = new List<string>
@@ -107,14 +106,12 @@ namespace SEScript
                 SelfCheck();
                 return;
             }
+            ExecuteCommand(msg);
             DisplayUI();
             DisplayStorage();
             CheckStatus();
             RandomTalk();
         }
-        /// <summary>
-        /// 进行自检并初始化
-        /// </summary>
         void SelfCheck()
         {
             isSelfCheckCompleted = true;
@@ -129,6 +126,8 @@ namespace SEScript
             LCDPanels.Add(opheliaSpeech);
             LCDPanels.Add(opheliaUI);
             LCDPanels.Add(opheliaStorage);
+
+            OpheliaMain = GridTerminalSystem.GetBlockWithName("LTC_Ophelia_Main") as IMyProgrammableBlock;
 
             string StatusCheck = "";
 
@@ -178,6 +177,14 @@ namespace SEScript
                 isSelfCheckCompleted = false;
             }
 
+            Gyrospheres = new List<IMyGyro>();
+            GridTerminalSystem.GetBlocksOfType(Gyrospheres);
+            if(Gyrospheres.Count == 0)
+            {
+                StatusCheck += "没有找到陀螺仪，Ophelia动不了啦！";
+                isSelfCheckCompleted = false;
+            }
+
             if (!isSelfCheckCompleted)
             {
                 ShowOverallMessage(StatusCheck);
@@ -185,6 +192,7 @@ namespace SEScript
             }
 
             isSelfCheckCompleted = true;
+            menuPos = new Vector3(0, 0, 0);
 
             opheliaSpeeches = new List<string>();
             curPowerStatus = PowerStatus.Charging;
@@ -223,7 +231,31 @@ namespace SEScript
         }
         void DisplayUI()
         {
+            string displayUI = "";
+            List<string> UI = new List<string>
+            {
+                "恢复手动驾驶",
+            };
+            if(!isManualFlight)
+            {
 
+                if(CaptainSeat.MoveIndicator.X>0)
+                {
+
+                }
+                if(CaptainSeat.MoveIndicator.X<0)
+                {
+
+                }
+                if(CaptainSeat.MoveIndicator.Y>0)
+                {
+                    OpheliaMain.TryRun("ManualFlight|True");
+                }
+            }else
+            {
+                displayUI = "手动飞行中";
+            }
+            opheliaUI.WriteText(displayUI);
         }
         void DisplayStorage()
         {
@@ -248,13 +280,27 @@ namespace SEScript
             double speed = CaptainSeat.GetShipVelocities().LinearVelocity.Length();
             storageMsg += "当前航速： " + speed.ToString("F2") + "m/s\r\n";
 
-            float cap = 0;
+            float Ocap = 0;
+            float OCount = 0;
+            float Hcap = 0;
+            float HCount = 0;
             for (int i = 0; i < GasBlocks.Count; i++)
             {
-                cap += (float)GasBlocks[i].FilledRatio;
+                Echo(GasBlocks[i].BlockDefinition.SubtypeName);
+                if (GasBlocks[i].BlockDefinition.SubtypeName.Contains("Hydrogen"))
+                {
+                    Hcap += (float)GasBlocks[i].FilledRatio;
+                    HCount += 1;
+                }else
+                {
+                    Ocap += (float)GasBlocks[i].FilledRatio;
+                    OCount += 1;
+                }
             }
-            GasLevel = (cap / GasBlocks.Count) * 100;
-            storageMsg += "气体储量： " + GasLevel.ToString("F2") + "%\r\n";
+            OxygenLevel = (Ocap / OCount) * 100f;
+            HydrogenLevel = (Hcap / HCount) * 100f;
+            storageMsg += "氧气储量： " + OxygenLevel.ToString("F2") + "%\r\n";
+            storageMsg += "氢气储量： " + HydrogenLevel.ToString("F2") + "%\r\n";
 
             storageMsg += "\r\n存储：\r\n";
 
@@ -267,7 +313,7 @@ namespace SEScript
                     for (int t = 0; t < InventoryBlocks[i].GetInventory().ItemCount; t++)
                     {
                         var inv = InventoryBlocks[i].GetInventory().GetItemAt(t);
-                        Echo(inv.Value.Type.TypeId);
+                        //Echo(inv.Value.Type.TypeId);
                         if (invList.ContainsKey(inv.Value.Type.SubtypeId))
                         {
                             invList[inv.Value.Type.SubtypeId] += inv.Value.Amount.RawValue / 1000000;
@@ -289,6 +335,7 @@ namespace SEScript
         }
         void CheckStatus()
         {
+            //检测电池能量储备
             float output = 0;
             float input = 0;
             foreach (IMyBatteryBlock battery in BatteryBlocks)
@@ -337,6 +384,12 @@ namespace SEScript
                 OpheliaSpeaks(chargeStatus);
                 lastPowerStatus = curPowerStatus;
             }
+
+            //检测氧气储备
+
+            //检测氢气储备
+
+            //检测弹药储备
         }
         void RandomTalk()
         {
@@ -368,6 +421,45 @@ namespace SEScript
                         }
                 }
                 talkTick = 0;
+            }
+        }
+        void ExecuteCommand(string msg)
+        {
+            string[] cmd = msg.Split('|');
+            switch(cmd[0])
+            {
+                case "Reset":
+                    {
+                        SelfCheck();
+                        break;
+                    }
+                case "ManualFlight":
+                    {
+                        switch(cmd[1])
+                        {
+                            case "True":
+                                {
+                                    CaptainSeat.ControlThrusters = true;
+                                    foreach (IMyGyro gyro in Gyrospheres)
+                                    {
+                                        gyro.GyroOverride = false;
+                                    }
+                                    isManualFlight = true;
+                                    break;
+                                }
+                            case "False":
+                                {
+                                    CaptainSeat.ControlThrusters = false;
+                                    foreach (IMyGyro gyro in Gyrospheres)
+                                    {
+                                        gyro.GyroOverride = true;
+                                    }
+                                    isManualFlight = false;
+                                    break;
+                                }
+                        }
+                        break;
+                    }
             }
         }
     }
