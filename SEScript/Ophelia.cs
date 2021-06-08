@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Numerics;
 using System.Text;
 using Sandbox.ModAPI.Ingame;
 using VRage.Game.ModAPI.Ingame;
@@ -50,6 +51,10 @@ namespace SEScript
         int randomTalkCD; //说话CD
         int talkTick; //说话时间
         OpheliaMood curMood; //当前心情
+
+        //--------------UI控制---------------------
+        bool isPilot; //当前是否控制推进器
+        Vector3 menuPos; //菜单选中位置
 
         enum PowerStatus
         {
