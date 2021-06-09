@@ -34,6 +34,11 @@ namespace SEScript
         List<IMyGyro> Gyrospheres; //陀螺仪方块
         IMyProgrammableBlock OpheliaMain; //主控程序块
 
+        IMyCameraBlock TargetIndicator; //目标选择镜头
+        IMyShipController TargetIndController; //目标选择控制
+        IMyMotorBase TargetIndRot_X;
+        IMyRadioAntenna Rador;
+
         //--------------用户设定---------------------
         bool isSelfCheckCompleted = false; //自检是否完成
 
@@ -98,6 +103,195 @@ namespace SEScript
             "Ophelia想要稍微休息一下……",
             "……",
             "呜呜呜……哎呀，不小心哭了出来呢……",
+        };
+        List<MenuItem> UIMenu_0 = new List<MenuItem>
+        {
+            new MenuItem()
+                {
+                    Description = "飞行控制",
+                    Command = "MenuNext",
+                },
+            new MenuItem()
+                {
+                    Description = "防御模式",
+                    Command = "MenuNext",
+                },
+            new MenuItem()
+                {
+                    Description = "攻击模式",
+                    Command = "MenuNext",
+                },
+            new MenuItem()
+                {
+                    Description = "库存信息",
+                    Command = "MenuNext",
+                },
+            new MenuItem()
+                {
+                    Description = "生产控制",
+                    Command = "MenuNext",
+                },
+            new MenuItem()
+                {
+                    Description = "人格选项",
+                    Command = "MenuNext",
+                },
+            new MenuItem()
+                {
+                    Description = "重启系统",
+                    Command = "Reset",
+                }
+        };
+        List<List<MenuItem>> UIMenu_1 = new List<List<MenuItem>>
+        {
+            new List<MenuItem>
+            {
+                new MenuItem()
+                {
+                    Description = "恢复手动飞行",
+                    Command = "ManualFlight|True",
+                },
+                new MenuItem()
+                {
+                    Description = "选择导航终点",
+                    Command = "",
+                },
+                new MenuItem()
+                {
+                    Description = "自动导航",
+                    Command = "",
+                },
+                new MenuItem()
+                {
+                    Description = "前进三",
+                    Command = "",
+                },
+                new MenuItem()
+                {
+                    Description = "停止",
+                    Command = "",
+                },
+                new MenuItem()
+                {
+                    Description = "自动对接",
+                    Command = "",
+                },
+                new MenuItem()
+                {
+                    Description = "启动跳跃",
+                    Command = "",
+                },
+                new MenuItem()
+                {
+                    Description = "返回",
+                    Command = "MenuBack",
+                },
+            },
+            new List<MenuItem>
+            {
+                new MenuItem()
+                {
+                    Description = "点防御系统", //可选On/Off
+                    Command = "",
+                },
+                new MenuItem()
+                {
+                    Description = "允许规避机动", //可选On/Off
+                    Command = "",
+                },
+                new MenuItem()
+                {
+                    Description = "返回",
+                    Command = "MenuBack",
+                },
+            },
+            new List<MenuItem>
+            {
+                new MenuItem()
+                {
+                    Description = "显示目标列表",
+                    Command = "",
+                },
+                new MenuItem()
+                {
+                    Description = "锁定最近目标",
+                    Command = "",
+                },
+                new MenuItem()
+                {
+                    Description = "锁定最大目标",
+                    Command = "",
+                },
+                new MenuItem()
+                {
+                    Description = "目标详细信息",
+                    Command = "",
+                },
+                new MenuItem()
+                {
+                    Description = "主炮组自动开火", //可选On/Off
+                    Command = "",
+                },
+                new MenuItem()
+                {
+                    Description = "返回",
+                    Command = "MenuBack",
+                },
+            },
+            new List<MenuItem>
+            {
+                new MenuItem()
+                {
+                    Description = "显示库存详情",
+                    Command = "",
+                },
+                new MenuItem()
+                {
+                    Description = "显示气体储量",
+                    Command = "",
+                },
+                new MenuItem()
+                {
+                    Description = "显示资源产量",
+                    Command = "",
+                },
+                new MenuItem()
+                {
+                    Description = "返回",
+                    Command = "MenuBack",
+                },
+            },
+            new List<MenuItem>
+            {
+                new MenuItem()
+                {
+                    Description =  "自动补充弹药", //可选On/Off
+                    Command = "",
+                },
+                new MenuItem()
+                {
+                    Description = "自动补充主炮部件", //可选On/Off
+                    Command = "",
+                },
+                new MenuItem()
+                {
+                    Description = "返回",
+                    Command = "MenuBack",
+                },
+            },
+            new List<MenuItem>
+            {
+                new MenuItem()
+                {
+                    Description = "人格开启", //可选On/Off
+                    Command = "",
+                },
+                new MenuItem()
+                {
+                    Description = "返回",
+                    Command = "MenuBack",
+                },
+            },
         };
         void Main(string msg)
         {
@@ -192,7 +386,7 @@ namespace SEScript
             }
 
             isSelfCheckCompleted = true;
-            menuPos = new Vector3(0, 0, 0);
+            menuPos = new Vector3(0, -1, -1);
 
             opheliaSpeeches = new List<string>();
             curPowerStatus = PowerStatus.Charging;
@@ -232,24 +426,77 @@ namespace SEScript
         void DisplayUI()
         {
             string displayUI = "";
-            List<string> UI = new List<string>
-            {
-                "恢复手动驾驶",
-            };
             if (!isManualFlight)
             {
+                if(menuPos.Y == -1)
+                {
+                    for(int i = 0;i<UIMenu_0.Count;i++)
+                    {
+                        if(menuPos.X == i)
+                        {
+                            displayUI += "=>";
+                        }
+                        displayUI += UIMenu_0[i] + "\r\n";
+                    }
+                }else
+                {
+                    for(int i = 0;i<UIMenu_1[(int)menuPos.X].Count;i++)
+                    {
+                        if(menuPos.Y == i)
+                        {
+                            displayUI += "=>";
+                        }
+                        displayUI += UIMenu_1[(int)menuPos.X][i] + "\r\n";
+                    }
+                }
 
                 if (CaptainSeat.MoveIndicator.Z > 0)
                 {
-
+                    if(menuPos.Y == -1)
+                    {
+                        menuPos.X -= 1;
+                        if(menuPos.X<0)
+                        {
+                            menuPos.X = UIMenu_0.Count - 1;
+                        }
+                    }else
+                    {
+                        menuPos.Y -= 1;
+                        if(menuPos.Y<0)
+                        {
+                            menuPos.Y = UIMenu_1[(int)menuPos.X].Count - 1;
+                        }
+                    }
                 }
                 if (CaptainSeat.MoveIndicator.Z < 0)
                 {
-
+                    if (menuPos.Y == -1)
+                    {
+                        menuPos.X += 1;
+                        if (menuPos.X >= UIMenu_0.Count)
+                        {
+                            menuPos.X = 0;
+                        }
+                    }
+                    else
+                    {
+                        menuPos.Y += 1;
+                        if (menuPos.Y >= UIMenu_1[(int)menuPos.X].Count)
+                        {
+                            menuPos.Y = 0;
+                        }
+                    }
                 }
+
                 if (CaptainSeat.MoveIndicator.Y > 0)
                 {
-                    OpheliaMain.TryRun("ManualFlight|True");
+                    if(menuPos.Y == -1)
+                    {
+                        OpheliaMain.CustomData = UIMenu_0[(int)menuPos.X].Command;
+                    }else
+                    {
+                        OpheliaMain.CustomData = UIMenu_1[(int)menuPos.X][(int)menuPos.Y].Command;
+                    }
                 }
             }
             else
@@ -426,6 +673,14 @@ namespace SEScript
         }
         void ExecuteCommand(string msg)
         {
+            if(string.IsNullOrEmpty(msg))
+            {
+                if (string.IsNullOrEmpty(OpheliaMain.CustomData))
+                {
+                    return;
+                }
+                msg = OpheliaMain.CustomData;
+            }
             string[] cmd = msg.Split('|');
             switch(cmd[0])
             {
@@ -461,7 +716,26 @@ namespace SEScript
                         }
                         break;
                     }
+                case "MenuNext":
+                    {
+                        menuPos = new Vector3(menuPos.X, 0, -1);
+                        break;
+                    }
+                case "MenuBack":
+                    {
+                        menuPos = new Vector3(0, -1, -1);
+                        break;
+                    }
+            }
+            if(!string.IsNullOrEmpty(OpheliaMain.CustomData))
+            {
+                OpheliaMain.CustomData = "";
             }
         }
+    }
+    public class MenuItem
+    {
+        public string Description;
+        public string Command;
     }
 }
