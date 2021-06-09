@@ -695,6 +695,7 @@ namespace SEScript
                         {
                             case "True":
                                 {
+                                    OpheliaSpeaks("恢复手动飞行~舰长要注意安全喔！");
                                     CaptainSeat.ControlThrusters = true;
                                     foreach (IMyGyro gyro in Gyrospheres)
                                     {
@@ -705,6 +706,7 @@ namespace SEScript
                                 }
                             case "False":
                                 {
+                                    OpheliaSpeaks("开始自动飞行~接下来请交给我吧！");
                                     CaptainSeat.ControlThrusters = false;
                                     foreach (IMyGyro gyro in Gyrospheres)
                                     {
