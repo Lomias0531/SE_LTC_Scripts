@@ -18,7 +18,7 @@ namespace SEScript
          * 当前目标：分别显示舰船氧气、氢气储量 - 完成
          * 获取视野中目标
          * 多方块通信
-         * UI控制与显示
+         * UI控制与显示 - 完成
          * 按顺序讲故事
          */
         //---------------游戏组件--------------------
@@ -34,10 +34,9 @@ namespace SEScript
         List<IMyGyro> Gyrospheres; //陀螺仪方块
         IMyProgrammableBlock OpheliaMain; //主控程序块
 
-        IMyCameraBlock TargetIndicator; //目标选择镜头
-        IMyShipController TargetIndController; //目标选择控制
-        IMyMotorBase TargetIndRot_X;
-        IMyRadioAntenna Rador;
+        //IMyCameraBlock TargetIndicator; //目标选择镜头
+        //IMyShipController TargetIndController; //目标选择控制
+        //IMyMotorBase TargetIndRot_X;
 
         //--------------用户设定---------------------
         bool isSelfCheckCompleted = false; //自检是否完成
@@ -64,6 +63,7 @@ namespace SEScript
         //--------------UI控制---------------------
         bool isManualFlight; //当前是否控制推进器
         Vector3 menuPos; //菜单选中位置
+        int menuTick = 0;
 
         enum PowerStatus
         {
@@ -425,50 +425,10 @@ namespace SEScript
         }
         void DisplayUI()
         {
-            string displayUI = "";
-            if (!isManualFlight)
+            menuTick -= 1;
+            if (menuTick <= 0)
             {
-                if(menuPos.Y == -1)
-                {
-                    for(int i = 0;i<UIMenu_0.Count;i++)
-                    {
-                        if(menuPos.X == i)
-                        {
-                            displayUI += "=>";
-                        }
-                        displayUI += UIMenu_0[i] + "\r\n";
-                    }
-                }else
-                {
-                    for(int i = 0;i<UIMenu_1[(int)menuPos.X].Count;i++)
-                    {
-                        if(menuPos.Y == i)
-                        {
-                            displayUI += "=>";
-                        }
-                        displayUI += UIMenu_1[(int)menuPos.X][i] + "\r\n";
-                    }
-                }
-
                 if (CaptainSeat.MoveIndicator.Z > 0)
-                {
-                    if(menuPos.Y == -1)
-                    {
-                        menuPos.X -= 1;
-                        if(menuPos.X<0)
-                        {
-                            menuPos.X = UIMenu_0.Count - 1;
-                        }
-                    }else
-                    {
-                        menuPos.Y -= 1;
-                        if(menuPos.Y<0)
-                        {
-                            menuPos.Y = UIMenu_1[(int)menuPos.X].Count - 1;
-                        }
-                    }
-                }
-                if (CaptainSeat.MoveIndicator.Z < 0)
                 {
                     if (menuPos.Y == -1)
                     {
@@ -486,16 +446,64 @@ namespace SEScript
                             menuPos.Y = 0;
                         }
                     }
+                    menuTick = 10;
                 }
-
+                if (CaptainSeat.MoveIndicator.Z < 0)
+                {
+                    if (menuPos.Y == -1)
+                    {
+                        menuPos.X -= 1;
+                        if (menuPos.X < 0)
+                        {
+                            menuPos.X = UIMenu_0.Count - 1;
+                        }
+                    }
+                    else
+                    {
+                        menuPos.Y -= 1;
+                        if (menuPos.Y < 0)
+                        {
+                            menuPos.Y = UIMenu_1[(int)menuPos.X].Count - 1;
+                        }
+                    }
+                    menuTick = 10;
+                }
                 if (CaptainSeat.MoveIndicator.Y > 0)
                 {
-                    if(menuPos.Y == -1)
+                    if (menuPos.Y == -1)
                     {
                         OpheliaMain.CustomData = UIMenu_0[(int)menuPos.X].Command;
-                    }else
+                    }
+                    else
                     {
                         OpheliaMain.CustomData = UIMenu_1[(int)menuPos.X][(int)menuPos.Y].Command;
+                    }
+                    menuTick = 10;
+                }
+            }
+
+            string displayUI = "";
+            if (!isManualFlight)
+            {
+                if(menuPos.Y == -1)
+                {
+                    for(int i = 0;i<UIMenu_0.Count;i++)
+                    {
+                        if(menuPos.X == i)
+                        {
+                            displayUI += "=>";
+                        }
+                        displayUI += UIMenu_0[i].Description + "\r\n";
+                    }
+                }else
+                {
+                    for(int i = 0;i<UIMenu_1[(int)menuPos.X].Count;i++)
+                    {
+                        if(menuPos.Y == i)
+                        {
+                            displayUI += "=>";
+                        }
+                        displayUI += UIMenu_1[(int)menuPos.X][i].Description + "\r\n";
                     }
                 }
             }
@@ -707,6 +715,7 @@ namespace SEScript
                             case "False":
                                 {
                                     OpheliaSpeaks("开始自动飞行~接下来请交给我吧！");
+                                    menuPos = new Vector3(0, -1, -1);
                                     CaptainSeat.ControlThrusters = false;
                                     foreach (IMyGyro gyro in Gyrospheres)
                                     {
