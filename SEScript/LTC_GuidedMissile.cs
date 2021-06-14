@@ -27,13 +27,12 @@ namespace SEScript
                 {
                     return;
                 }
-                string[] targetPos = cmd[1].Split(',');
+                string[] targetPos = cmd[1].Split('_');
                 Echo(cmd[1]);
-                //double x = double.Parse(targetPos[0]);
-                //double y = double.Parse(targetPos[1]);
-                //double z = double.Parse(targetPos[2]);
-                Vector3D.TryParse(cmd[1], out Vector3D Target);
-                //Vector3D Target = new Vector3D(x, y, z);
+                float x = float.Parse(targetPos[0]);
+                float y = float.Parse(targetPos[1]);
+                float z = float.Parse(targetPos[2]);
+                Vector3D Target = new Vector3D(x, y, z);
                 CPU.Direction = Base6Directions.Direction.Forward;
                 CPU.AddWaypoint(Target, "Target");
                 targetAcquired = true;
@@ -42,11 +41,16 @@ namespace SEScript
             else
             {
                 guideCountDown += 1;
-                if (guideCountDown >= 500)
+                if (guideCountDown >= 100 && guideCountDown < 250)
                 {
                     CPU.SetAutoPilotEnabled(true);
                     CPU.FlightMode = FlightMode.OneWay;
                     MainThu.ThrustOverridePercentage = 0f;
+                }
+                if(guideCountDown >= 250)
+                {
+                    CPU.SetAutoPilotEnabled(false);
+                    MainThu.ThrustOverridePercentage = 1f;
                 }
             }
         }
