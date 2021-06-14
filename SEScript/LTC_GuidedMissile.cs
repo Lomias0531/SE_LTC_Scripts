@@ -13,6 +13,8 @@ namespace SEScript
         bool CheckReady = false;
         bool targetAcquired = false;
         IMyThrust MainThu;
+        IMyGyro gyro;
+        Vector3D TargetPos;
         void Main(string arg)
         {
             if(!CheckReady)
@@ -32,25 +34,37 @@ namespace SEScript
                 float x = float.Parse(targetPos[0]);
                 float y = float.Parse(targetPos[1]);
                 float z = float.Parse(targetPos[2]);
-                Vector3D Target = new Vector3D(x, y, z);
+                TargetPos = new Vector3D(x, y, z);
+                Echo(TargetPos.ToString());
                 CPU.Direction = Base6Directions.Direction.Forward;
-                CPU.AddWaypoint(Target, "Target");
                 targetAcquired = true;
-                MainThu.ThrustOverridePercentage = 1f;
+                gyro.GyroOverride = true;
+                //MainThu.ThrustOverridePercentage = 1f;
             }
             else
             {
                 guideCountDown += 1;
-                if (guideCountDown >= 100 && guideCountDown < 250)
+                if (guideCountDown >= 100)
                 {
-                    CPU.SetAutoPilotEnabled(true);
-                    CPU.FlightMode = FlightMode.OneWay;
-                    MainThu.ThrustOverridePercentage = 0f;
-                }
-                if(guideCountDown >= 250)
-                {
-                    CPU.SetAutoPilotEnabled(false);
-                    MainThu.ThrustOverridePercentage = 1f;
+                    Vector3D ang = Vector3D.Normalize(TargetPos - CPU.GetPosition()) - CPU.WorldMatrix.Forward;
+                    Echo(CPU.WorldMatrix.Forward.ToString());
+                    Echo(ang.ToString());
+                    if(ang.Z>0)
+                    {
+                        gyro.Yaw = -30f * ((float)ang.Z);
+                    }
+                    if(ang.Z<0)
+                    {
+                        gyro.Yaw = 30f * ((float)ang.Z);
+                    }
+                    if(ang.Y>0)
+                    {
+                        gyro.Pitch = -30f * ((float)(ang.Y));
+                    }
+                    if(ang.Y<0)
+                    {
+                        gyro.Pitch = 30f * ((float)(ang.Y));
+                    }
                 }
             }
         }
@@ -68,6 +82,11 @@ namespace SEScript
             if(MainThu == null)
             {
                 Echo("EEE");
+                return;
+            }
+            gyro = GridTerminalSystem.GetBlockWithName("MissileGyro") as IMyGyro;
+            if(gyro == null)
+            {
                 return;
             }
 
