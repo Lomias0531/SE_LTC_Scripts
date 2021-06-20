@@ -27,7 +27,7 @@ namespace SEScript
             if (!targetAcquired)
             {
                 string[] cmd = arg.Split('|');
-                if (cmd[0] != "MissileTarget")
+                if (cmd[0] != "TargetPos")
                 {
                     return;
                 }
