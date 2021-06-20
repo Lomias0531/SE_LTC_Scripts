@@ -5,7 +5,7 @@ using System.Numerics;
 
 namespace SE
 {
-    class Program : ThisAPI
+    class Program : API
     {
         IMyShipController controller;
         List<IMyTextSurface> LCDPanels;
