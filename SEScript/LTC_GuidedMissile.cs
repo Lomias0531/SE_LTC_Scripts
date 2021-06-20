@@ -1,7 +1,9 @@
 ﻿using Sandbox.ModAPI.Ingame;
+using Sandbox.ModAPI.Interfaces;
 using System;
 using System.Collections.Generic;
 using System.Text;
+using VRage.ModAPI;
 using VRageMath;
 
 namespace SEScript
@@ -12,8 +14,8 @@ namespace SEScript
         IMyRemoteControl CPU;
         bool CheckReady = false;
         bool targetAcquired = false;
-        IMyThrust MainThu;
-        IMyGyro gyro;
+        List<IMyThrust> MainThu;
+        List<IMyGyro> gyro;
         Vector3D TargetPos;
         void Main(string arg)
         {
@@ -38,60 +40,109 @@ namespace SEScript
                 Echo(TargetPos.ToString());
                 CPU.Direction = Base6Directions.Direction.Forward;
                 targetAcquired = true;
-                gyro.GyroOverride = true;
-                //MainThu.ThrustOverridePercentage = 1f;
+                foreach (var item in gyro)
+                {
+                    item.GyroOverride = true;
+                }
+                foreach (var Thu in MainThu)
+                {
+                    Thu.ThrustOverridePercentage = 1f;
+                }
             }
             else
             {
                 guideCountDown += 1;
                 if (guideCountDown >= 100)
                 {
-                    Vector3D ang = Vector3D.Normalize(TargetPos - CPU.GetPosition()) - CPU.WorldMatrix.Forward;
-                    Echo(CPU.WorldMatrix.Forward.ToString());
-                    Echo(ang.ToString());
-                    if(ang.Z>0)
-                    {
-                        gyro.Yaw = -30f * ((float)ang.Z);
-                    }
-                    if(ang.Z<0)
-                    {
-                        gyro.Yaw = 30f * ((float)ang.Z);
-                    }
-                    if(ang.Y>0)
-                    {
-                        gyro.Pitch = -30f * ((float)(ang.Y));
-                    }
-                    if(ang.Y<0)
-                    {
-                        gyro.Pitch = 30f * ((float)(ang.Y));
-                    }
+                    LTC_GyroLookAt(CPU as IMyEntity, TargetPos, gyro);
                 }
             }
         }
         void CheckComponent()
         {
-            List<IMyRemoteControl> Remote = new List<IMyRemoteControl>();
-            GridTerminalSystem.GetBlocksOfType(Remote);
-            if (Remote.Count == 0)
+            List<IMyBlockGroup> groups = new List<IMyBlockGroup>();
+            GridTerminalSystem.GetBlockGroups(groups);
+            foreach (var group in groups)
             {
-                return;
-            }
-            CPU = Remote[0];
+                List<IMyTerminalBlock> terminals = new List<IMyTerminalBlock>();
+                group.GetBlocks(terminals);
+                if(terminals.Contains(this as IMyTerminalBlock))
+                {
+                    List<IMyRemoteControl> Remote = new List<IMyRemoteControl>();
+                    group.GetBlocksOfType(Remote);
+                    if (Remote.Count == 0)
+                    {
+                        Echo("Remote Error");
+                        continue;
+                    }
+                    CPU = Remote[0];
 
-            MainThu = GridTerminalSystem.GetBlockWithName("Forward") as IMyThrust;
-            if(MainThu == null)
-            {
-                Echo("EEE");
-                return;
-            }
-            gyro = GridTerminalSystem.GetBlockWithName("MissileGyro") as IMyGyro;
-            if(gyro == null)
-            {
-                return;
-            }
+                    MainThu = new List<IMyThrust>();
+                    group.GetBlocksOfType(MainThu, blocks => blocks.Name == "Backwards");
+                    foreach (var item in MainThu)
+                    {
+                        Echo(item.GridThrustDirection.ToString());
+                    }
+                    if (MainThu.Count == 0)
+                    {
+                        Echo("Thrust Error");
+                        continue;
+                    }
+                    gyro = new List<IMyGyro>();
 
-            Runtime.UpdateFrequency = UpdateFrequency.Update1;
-            CheckReady = true;
+                    group.GetBlocksOfType(gyro);
+                    if (gyro == null)
+                    {
+                        Echo("Gyro Error");
+                        continue;
+                    }
+
+                    Runtime.UpdateFrequency = UpdateFrequency.Update1;
+                    CheckReady = true;
+                    return;
+                }
+            }
         }
+        void LTC_GyroLookAt(IMyEntity block,Vector3D pos,List<IMyGyro> gyro)
+        {
+            MatrixD matrix = MatrixD.CreateLookAt(new Vector3D(), block.WorldMatrix.Forward, block.WorldMatrix.Up);
+            Vector3D posAngle = Vector3D.Normalize(Vector3D.TransformNormal(pos - block.GetPosition(), matrix));
+            Echo(posAngle.ToString());
+            foreach (var Gyr in gyro)
+            {
+                Gyr.SetValue("Pitch", (float)posAngle.Y * 60f);
+                Gyr.SetValue("Yaw", (float)posAngle.X * 60f);
+            }
+        }
+
+        //List<IMyBlockGroup> groups;
+        //IMyMotorStator HorizontalRot;
+        //IMyMotorStator VecticalRot;
+        //void LTC_RotLookAt(IMyEntity block,Vector3D pos,IMyMotorStator HoriRot,IMyMotorStator VectRot)
+        //{
+        //    GridTerminalSystem.GetBlockGroups(groups);
+        //    foreach (var group in groups)
+        //    {
+        //        List<IMyTerminalBlock> terminals = new List<IMyTerminalBlock>();
+        //        group.GetBlocks(terminals);
+        //        if(terminals.Contains(block as IMyTerminalBlock))
+        //        {
+        //            foreach (var item in terminals)
+        //            {
+        //                if(item.CustomName == "Horizontal")
+        //                {
+        //                    HorizontalRot = item as IMyMotorStator;
+        //                    continue;
+        //                }
+        //                if(item.CustomName == "Vertical")
+        //                {
+        //                    VecticalRot = item as IMyMotorStator;
+        //                    continue;
+        //                }
+        //            }
+        //            break;
+        //        }
+        //    }
+        //}
     }
 }
