@@ -15,6 +15,7 @@ namespace SEScript
         IMyMotorStator VertRot;
         IMyMotorStator HoriRot;
         IMyRemoteControl controller;
+        IMyRadioAntenna antenna;
         List<IMyRemoteControl> MissileComputers;
         void Main()
         {
@@ -101,19 +102,23 @@ namespace SEScript
         {
             if (controller.RotationIndicator.X > 0)
             {
-
+                HoriRot.TargetVelocityRPM = 20;
             }
             if (controller.RotationIndicator.X < 0)
             {
-
+                HoriRot.TargetVelocityRPM = -20;
             }
             if (controller.RotationIndicator.Y > 0)
             {
-
+                VertRot.TargetVelocityRPM = 20;
             }
             if (controller.RotationIndicator.Y < 0)
             {
-
+                VertRot.TargetVelocityRPM = -20;
+            }
+            if(controller.MoveIndicator.Y>0)
+            {
+                SelectTarget();
             }
         }
         void SelectTarget()
@@ -126,6 +131,14 @@ namespace SEScript
             foreach (var MissileCPU in MissileComputers)
             {
                 MissileCPU.CustomData = "TargetPos|" + target.HitPosition.Value.X.ToString() + "_" + target.HitPosition.Value.Y.ToString() + "_" + target.HitPosition.Value.ToString();
+            }
+        }
+        void TrackingTarget()
+        {
+            MyDetectedEntityInfo target = thisCam.Raycast(4000);
+            if (target.IsEmpty())
+            {
+                return;
             }
         }
     }
