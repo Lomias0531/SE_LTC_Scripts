@@ -16,6 +16,7 @@ namespace SEScript
         IMyMotorStator HoriRot;
         IMyRemoteControl controller;
         IMyRadioAntenna antenna;
+        IMyIntergridCommunicationSystem comms;
         List<IMyRemoteControl> MissileComputers;
         void Main()
         {
