@@ -16,7 +16,6 @@ namespace SEScript
         IMyMotorStator HoriRot;
         IMyRemoteControl controller;
         IMyRadioAntenna antenna;
-        IMyIntergridCommunicationSystem comms;
         List<IMyRemoteControl> MissileComputers;
         void Main()
         {
@@ -129,6 +128,7 @@ namespace SEScript
             {
                 return;
             }
+
             foreach (var MissileCPU in MissileComputers)
             {
                 MissileCPU.CustomData = "TargetPos|" + target.HitPosition.Value.X.ToString() + "_" + target.HitPosition.Value.Y.ToString() + "_" + target.HitPosition.Value.ToString();
@@ -141,6 +141,7 @@ namespace SEScript
             {
                 return;
             }
+            IntergridCommunicationSystem.SendBroadcastMessage("TargetPos", target.HitPosition.Value.X.ToString() + "_" + target.HitPosition.Value.Y.ToString() + "_" + target.HitPosition.Value.ToString());
         }
     }
 }
