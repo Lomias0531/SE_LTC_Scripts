@@ -25,24 +25,8 @@ namespace SEScript
         }
         void MoveByRotor()
         {
-            VerticalRot.TargetVelocityRPM = 0;
-            HorizontalRot.TargetVelocityRPM = 0;
-            if(remote.RotationIndicator.X>0)
-            {
-                HorizontalRot.TargetVelocityRPM = 4 * remote.RotationIndicator.X;
-            }
-            if(remote.RotationIndicator.X<0)
-            {
-                HorizontalRot.TargetVelocityRPM = -4 * remote.RotationIndicator.X;
-            }
-            if(remote.RotationIndicator.Y>0)
-            {
-                VerticalRot.TargetVelocityRPM = 2 * remote.RotationIndicator.Y;
-            }
-            if(remote.RotationIndicator.Y<0)
-            {
-                VerticalRot.TargetVelocityRPM = -2 * remote.RotationIndicator.Y;
-            }
+            HorizontalRot.TargetVelocityRPM = remote.RotationIndicator.X;
+            VerticalRot.TargetVelocityRPM = remote.RotationIndicator.Y;
         }
         void CheckComponents()
         {
