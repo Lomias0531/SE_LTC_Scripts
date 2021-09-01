@@ -12,6 +12,7 @@ namespace SEScript
     {
         IMyMotorStator VerticalRot;
         IMyMotorStator HorizontalRot;
+        IMyMotorStator VerticalRev;
         IMyRemoteControl remote;
         bool CheckReady = false;
         void Main()
@@ -25,11 +26,13 @@ namespace SEScript
         }
         void MoveByRotor()
         {
-            HorizontalRot.TargetVelocityRPM = remote.RotationIndicator.X;
-            VerticalRot.TargetVelocityRPM = remote.RotationIndicator.Y;
+            HorizontalRot.TargetVelocityRPM = remote.RotationIndicator.Y;
+            VerticalRot.TargetVelocityRPM = remote.RotationIndicator.X;
+            VerticalRev.TargetVelocityRPM = remote.RotationIndicator.X * -1;
         }
         void CheckComponents()
         {
+            IMyBlockGroup thisGroup;
             Runtime.UpdateFrequency = UpdateFrequency.Update1;
             remote = GridTerminalSystem.GetBlockWithName("Remote") as IMyRemoteControl;
             if(remote == null)
@@ -42,6 +45,11 @@ namespace SEScript
             {
                 Echo("Vertical");
                 return;
+            }
+            VerticalRev = GridTerminalSystem.GetBlockWithName("VerticalRotRev") as IMyMotorStator;
+            if (VerticalRot == null)
+            {
+                Echo("VerticalRev");
             }
             HorizontalRot = GridTerminalSystem.GetBlockWithName("HorizontalRot") as IMyMotorStator;
             if(HorizontalRot == null)
