@@ -39,7 +39,7 @@ namespace SEScript
             {
                 List<IMyTerminalBlock> terminals = new List<IMyTerminalBlock>();
                 group.GetBlocks(terminals);
-                if (terminals.Contains(this as IMyTerminalBlock))
+                if (terminals.Contains(Me as IMyTerminalBlock))
                 {
                     List<IMyCameraBlock> cams = new List<IMyCameraBlock>();
                     group.GetBlocksOfType(cams);

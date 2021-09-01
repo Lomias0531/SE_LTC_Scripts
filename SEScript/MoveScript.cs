@@ -1,5 +1,6 @@
 ﻿using Sandbox.ModAPI.Ingame;
 using Sandbox.ModAPI.Interfaces;
+using SpaceEngineers.Game.ModAPI.Ingame;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -14,6 +15,7 @@ namespace SEScript
         IMyMotorStator HorizontalRot;
         IMyMotorStator VerticalRev;
         IMyRemoteControl remote;
+        IMyTimerBlock Trigger;
         bool CheckReady = false;
         void Main()
         {
@@ -22,6 +24,7 @@ namespace SEScript
                 CheckComponents();
                 return;
             }
+            Echo("EEE");
             MoveByRotor();
         }
         void MoveByRotor()
@@ -34,40 +37,85 @@ namespace SEScript
         {
             List<IMyBlockGroup> groups = new List<IMyBlockGroup>();
             GridTerminalSystem.GetBlockGroups(groups);
+            Echo(groups.Count.ToString());
             foreach (var group in groups)
             {
                 List<IMyTerminalBlock> terminals = new List<IMyTerminalBlock>();
                 group.GetBlocks(terminals);
-                if (terminals.Contains(this as IMyTerminalBlock))
+                Echo(group.Name);
+                if (terminals.Contains(Me as IMyTerminalBlock))
                 {
-                    remote = GridTerminalSystem.GetBlockWithName("Remote") as IMyRemoteControl;
-                    if (remote == null)
+                    Echo("ERE");
+                    //remote = GridTerminalSystem.GetBlockWithName("LTC_TurretRemote") as IMyRemoteControl;
+                    List<IMyRemoteControl> remotes = new List<IMyRemoteControl>();
+                    group.GetBlocksOfType(remotes, blocks => blocks.CustomName == "Remote");
+                    if (remotes.Count == 0)
                     {
-                        Echo("Remote");
-                        return;
+                        continue;
                     }
-                    VerticalRot = GridTerminalSystem.GetBlockWithName("VerticalRot") as IMyMotorStator;
-                    if (VerticalRot == null)
+                    remote = remotes[0];
+                    //VerticalRot = GridTerminalSystem.GetBlockWithName("VerticalRot") as IMyMotorStator;
+                    List<IMyMotorStator> vet = new List<IMyMotorStator>();
+                    group.GetBlocksOfType(vet, blocks => blocks.CustomName == "VerticalRot");
+                    if (vet.Count == 0)
                     {
-                        Echo("Vertical");
-                        return;
+                        continue;
                     }
-                    VerticalRev = GridTerminalSystem.GetBlockWithName("VerticalRotRev") as IMyMotorStator;
-                    if (VerticalRot == null)
+                    VerticalRot = vet[0];
+                    //VerticalRev = GridTerminalSystem.GetBlockWithName("VerticalRotRev") as IMyMotorStator;
+                    group.GetBlocksOfType(vet, blocks => blocks.CustomName == "VerticalRotRev");
+                    if (vet.Count == 0)
                     {
-                        Echo("VerticalRev");
+                        continue;
                     }
-                    HorizontalRot = GridTerminalSystem.GetBlockWithName("HorizontalRot") as IMyMotorStator;
-                    if (HorizontalRot == null)
+                    VerticalRev = vet[0];
+                    //HorizontalRot = GridTerminalSystem.GetBlockWithName("HorizontalRot") as IMyMotorStator;
+                    group.GetBlocksOfType(vet, blocks => blocks.CustomName == "HorizontalRot");
+                    if (vet.Count == 0)
                     {
-                        Echo("Horizontal");
-                        return;
+                        continue;
                     }
-                    Runtime.UpdateFrequency = UpdateFrequency.Update1;
-                    CheckReady = true;
-                    return;
+                    HorizontalRot = vet[0];
+                    //Trigger = GridTerminalSystem.GetBlockWithName("LTC_Trigger") as IMyTimerBlock;
+                    List<IMyTimerBlock> tim = new List<IMyTimerBlock>();
+                    group.GetBlocksOfType(tim, blocks => blocks.CustomName == "LTC_Trigger");
+                    if (tim.Count == 0)
+                    {
+                        continue;
+                    }
+                    Trigger = tim[0];
                 }
-            }                   
+            }
+
+            if (remote == null)
+            {
+                Echo("Remote");
+                return;
+            }
+            if (VerticalRot == null)
+            {
+                Echo("Vertical");
+                return;
+            }
+            if (VerticalRot == null)
+            {
+                Echo("VerticalRev");
+                return;
+            }
+            if (HorizontalRot == null)
+            {
+                Echo("Horizontal");
+                return;
+            }
+            if (Trigger == null)
+            {
+                Echo("Timer");
+                return;
+            }
+
+            Runtime.UpdateFrequency = UpdateFrequency.Update1;
+            CheckReady = true;
+            return;
         }
     }
 }

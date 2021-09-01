@@ -17,6 +17,13 @@ namespace SEScript
         bool CheckReady = false;
 
         Vector3D targetPos;
+        TurretStatus curStatus = TurretStatus.Idle;
+        enum TurretStatus
+        {
+            Aiming,
+            Idle,
+            Manual,
+        }
         void Main(string msg)
         {
             if (!CheckReady)
@@ -25,7 +32,24 @@ namespace SEScript
                 return;
             }
             DeseralizeMsg(msg);
-            MoveByRotor();
+            switch(curStatus)
+            {
+                case TurretStatus.Aiming:
+                    {
+                        AimByRotor();
+                        break;
+                    }
+                case TurretStatus.Idle:
+                    {
+                        RestorePos();
+                        break;
+                    }
+                case TurretStatus.Manual:
+                    {
+                        MoveByRotor();
+                        break;
+                    }
+            }
         }
         void MoveByRotor()
         {
@@ -41,6 +65,10 @@ namespace SEScript
             VerticalRev.TargetVelocityRPM = (float)posAngle.Y * -1;
             HorizontalRot.TargetVelocityRPM = (float)posAngle.X;
         }
+        void RestorePos()
+        {
+            
+        }
         void CheckComponents()
         {
             List<IMyBlockGroup> groups = new List<IMyBlockGroup>();
@@ -49,41 +77,36 @@ namespace SEScript
             {
                 List<IMyTerminalBlock> terminals = new List<IMyTerminalBlock>();
                 group.GetBlocks(terminals);
-                if (terminals.Contains(this as IMyTerminalBlock))
+                if (terminals.Contains(Me as IMyTerminalBlock))
                 {
-                    //remote = GridTerminalSystem.GetBlockWithName("LTC_TurretRemote") as IMyRemoteControl;
                     List<IMyRemoteControl> remotes = new List<IMyRemoteControl>();
-                    group.GetBlocksOfType(remotes);
+                    group.GetBlocksOfType(remotes,blocks => blocks.CustomName == "Remote");
                     if (remotes.Count == 0)
                     {
                         continue;
                     }
                     remote = remotes[0];
-                    //VerticalRot = GridTerminalSystem.GetBlockWithName("VerticalRot") as IMyMotorStator;
                     List<IMyMotorStator> vet = new List<IMyMotorStator>();
-                    group.GetBlocksOfType(vet, blocks => blocks.Name == "VerticalRot");
+                    group.GetBlocksOfType(vet, blocks => blocks.CustomName == "VerticalRot");
                     if (vet.Count == 0)
                     {
                         continue;
                     }
                     VerticalRot = vet[0];
-                    //VerticalRev = GridTerminalSystem.GetBlockWithName("VerticalRotRev") as IMyMotorStator;
-                    group.GetBlocksOfType(vet, blocks => blocks.Name == "VerticalRotRev");
+                    group.GetBlocksOfType(vet, blocks => blocks.CustomName == "VerticalRotRev");
                     if (vet.Count == 0)
                     {
                         continue;
                     }
                     VerticalRev = vet[0];
-                    //HorizontalRot = GridTerminalSystem.GetBlockWithName("HorizontalRot") as IMyMotorStator;
-                    group.GetBlocksOfType(vet, blocks => blocks.Name == "HorizontalRot");
+                    group.GetBlocksOfType(vet, blocks => blocks.CustomName == "HorizontalRot");
                     if (vet.Count == 0)
                     {
                         continue;
                     }
                     HorizontalRot = vet[0];
-                    //Trigger = GridTerminalSystem.GetBlockWithName("LTC_Trigger") as IMyTimerBlock;
                     List<IMyTimerBlock> tim = new List<IMyTimerBlock>();
-                    group.GetBlocksOfType(tim, blocks => blocks.Name == "LTC_Trigger");
+                    group.GetBlocksOfType(tim, blocks => blocks.CustomName == "LTC_Trigger");
                     if(tim.Count == 0)
                     {
                         continue;
@@ -138,11 +161,22 @@ namespace SEScript
                         float y = float.Parse(pos[1]);
                         float z = float.Parse(pos[2]);
                         targetPos = new Vector3D(x, y, z);
+                        curStatus = TurretStatus.Aiming;
                         return;
                     }
                 case "Fire":
                     {
                         Trigger.Trigger();
+                        return;
+                    }
+                case "Idle":
+                    {
+                        curStatus = TurretStatus.Idle;
+                        return;
+                    }
+                case "Manual":
+                    {
+                        curStatus = TurretStatus.Manual;
                         return;
                     }
             }
