@@ -16,7 +16,7 @@ namespace SEScript
         IMyMotorStator HoriRot;
         IMyRemoteControl controller;
         IMyRadioAntenna antenna;
-        List<IMyRemoteControl> MissileComputers;
+        List<IMyProgrammableBlock> TurretControls;
         void Main()
         {
             if (!Checked)
@@ -79,18 +79,18 @@ namespace SEScript
                     }
                 }
 
-                MissileComputers = new List<IMyRemoteControl>();
+                TurretControls = new List<IMyProgrammableBlock>();
                 foreach (var item in terminals)
                 {
-                    if (item.CustomName == "LTC_MissileComputer")
+                    if (item.CustomName == "LTC_TurretRemote")
                     {
-                        MissileComputers.Add(item as IMyRemoteControl);
+                        TurretControls.Add(item as IMyProgrammableBlock);
                     }
                 }
 
-                if (MissileComputers.Count == 0)
+                if (TurretControls.Count == 0)
                 {
-                    Echo("Missile Error");
+                    Echo("Turret Error");
                     return;
                 }
 
@@ -100,25 +100,15 @@ namespace SEScript
         }
         void ControlCam()
         {
-            if (controller.RotationIndicator.X > 0)
-            {
-                HoriRot.TargetVelocityRPM = 20;
-            }
-            if (controller.RotationIndicator.X < 0)
-            {
-                HoriRot.TargetVelocityRPM = -20;
-            }
-            if (controller.RotationIndicator.Y > 0)
-            {
-                VertRot.TargetVelocityRPM = 20;
-            }
-            if (controller.RotationIndicator.Y < 0)
-            {
-                VertRot.TargetVelocityRPM = -20;
-            }
+            HoriRot.TargetVelocityRPM = controller.RotationIndicator.X;
+            VertRot.TargetVelocityRPM = controller.RotationIndicator.Y;
             if(controller.MoveIndicator.Y>0)
             {
                 SelectTarget();
+            }
+            if(controller.MoveIndicator.Y<0)
+            {
+                FireCommand();
             }
         }
         void SelectTarget()
@@ -129,9 +119,16 @@ namespace SEScript
                 return;
             }
 
-            foreach (var MissileCPU in MissileComputers)
+            foreach (var turretControl in TurretControls)
             {
-                MissileCPU.CustomData = "TargetPos|" + target.HitPosition.Value.X.ToString() + "_" + target.HitPosition.Value.Y.ToString() + "_" + target.HitPosition.Value.ToString();
+                turretControl.CustomData = "TargetPos|" + target.HitPosition.Value.X.ToString() + "_" + target.HitPosition.Value.Y.ToString() + "_" + target.HitPosition.Value.ToString();
+            }
+        }
+        void FireCommand()
+        {
+            foreach (var turretControl in TurretControls)
+            {
+                turretControl.CustomData = "Fire|111";
             }
         }
         void TrackingTarget()

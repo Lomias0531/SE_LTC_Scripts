@@ -32,34 +32,42 @@ namespace SEScript
         }
         void CheckComponents()
         {
-            IMyBlockGroup thisGroup;
-            Runtime.UpdateFrequency = UpdateFrequency.Update1;
-            remote = GridTerminalSystem.GetBlockWithName("Remote") as IMyRemoteControl;
-            if(remote == null)
+            List<IMyBlockGroup> groups = new List<IMyBlockGroup>();
+            GridTerminalSystem.GetBlockGroups(groups);
+            foreach (var group in groups)
             {
-                Echo("Remote");
-                return;
-            }
-            VerticalRot = GridTerminalSystem.GetBlockWithName("VerticalRot") as IMyMotorStator;
-            if(VerticalRot == null)
-            {
-                Echo("Vertical");
-                return;
-            }
-            VerticalRev = GridTerminalSystem.GetBlockWithName("VerticalRotRev") as IMyMotorStator;
-            if (VerticalRot == null)
-            {
-                Echo("VerticalRev");
-            }
-            HorizontalRot = GridTerminalSystem.GetBlockWithName("HorizontalRot") as IMyMotorStator;
-            if(HorizontalRot == null)
-            {
-                Echo("Horizontal");
-                return;
-            }
-            CheckReady = true;
-            return;
-            
+                List<IMyTerminalBlock> terminals = new List<IMyTerminalBlock>();
+                group.GetBlocks(terminals);
+                if (terminals.Contains(this as IMyTerminalBlock))
+                {
+                    remote = GridTerminalSystem.GetBlockWithName("Remote") as IMyRemoteControl;
+                    if (remote == null)
+                    {
+                        Echo("Remote");
+                        return;
+                    }
+                    VerticalRot = GridTerminalSystem.GetBlockWithName("VerticalRot") as IMyMotorStator;
+                    if (VerticalRot == null)
+                    {
+                        Echo("Vertical");
+                        return;
+                    }
+                    VerticalRev = GridTerminalSystem.GetBlockWithName("VerticalRotRev") as IMyMotorStator;
+                    if (VerticalRot == null)
+                    {
+                        Echo("VerticalRev");
+                    }
+                    HorizontalRot = GridTerminalSystem.GetBlockWithName("HorizontalRot") as IMyMotorStator;
+                    if (HorizontalRot == null)
+                    {
+                        Echo("Horizontal");
+                        return;
+                    }
+                    Runtime.UpdateFrequency = UpdateFrequency.Update1;
+                    CheckReady = true;
+                    return;
+                }
+            }                   
         }
     }
 }
