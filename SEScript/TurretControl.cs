@@ -15,6 +15,8 @@ namespace SEScript
         IMyTimerBlock Trigger;
         IMyRemoteControl remote;
         bool CheckReady = false;
+        float fireCount = 0;
+        float fireCD = 300f;
 
         Vector3D targetPos;
         TurretStatus curStatus = TurretStatus.Idle;
@@ -31,11 +33,14 @@ namespace SEScript
                 CheckComponents();
                 return;
             }
+            fireCount = (fireCount > 0) ? fireCount -= 1 : 0;
+            Echo("Running");
             DeseralizeMsg(msg);
             switch(curStatus)
             {
                 case TurretStatus.Aiming:
                     {
+                        Echo("Targeting " + targetPos.ToString());
                         AimByRotor();
                         break;
                     }
@@ -59,15 +64,27 @@ namespace SEScript
         }
         void AimByRotor()
         {
-            MatrixD matrix = MatrixD.CreateLookAt(new Vector3D(), remote.WorldMatrix.Forward, remote.WorldMatrix.Up);
-            Vector3D posAngle = Vector3D.Normalize(Vector3D.TransformNormal(targetPos - remote.GetPosition(), matrix));
-            VerticalRot.TargetVelocityRPM = (float)posAngle.Y;
-            VerticalRev.TargetVelocityRPM = (float)posAngle.Y * -1;
-            HorizontalRot.TargetVelocityRPM = (float)posAngle.X;
+            LookAtDirection(targetPos, true);
         }
         void RestorePos()
         {
-            
+            Vector3D restorePos = GridTerminalSystem.GetBlockWithName("MainControl").GetPosition() + GridTerminalSystem.GetBlockWithName("MainControl").WorldMatrix.Forward * 1000f;
+            LookAtDirection(restorePos, false);
+            return;
+        }
+        void LookAtDirection(Vector3D pos,bool isFiring)
+        {
+            MatrixD matrix = MatrixD.CreateLookAt(new Vector3D(), remote.WorldMatrix.Forward, remote.WorldMatrix.Up);
+            Vector3D posAngle = Vector3D.Normalize(Vector3D.TransformNormal(pos - remote.GetPosition(), matrix));
+            double distance = Vector3D.Distance(remote.GetPosition(), pos);
+            fireCD = distance > 1500 ? ((float)distance / 1000f) * 300f : 300f;
+            if (posAngle.X > -0.01f && posAngle.X < 0.01f && posAngle.Y > -0.01f && posAngle.Y < 0.01f && isFiring)
+            {
+                Fire();
+            }
+            VerticalRot.TargetVelocityRPM = (float)posAngle.Y * -5;
+            VerticalRev.TargetVelocityRPM = (float)posAngle.Y * 5;
+            HorizontalRot.TargetVelocityRPM = (float)posAngle.X * 5;
         }
         void CheckComponents()
         {
@@ -86,6 +103,7 @@ namespace SEScript
                         continue;
                     }
                     remote = remotes[0];
+                    remote.Direction = Base6Directions.Direction.Forward;
                     List<IMyMotorStator> vet = new List<IMyMotorStator>();
                     group.GetBlocksOfType(vet, blocks => blocks.CustomName == "VerticalRot");
                     if (vet.Count == 0)
@@ -145,8 +163,17 @@ namespace SEScript
             CheckReady = true;
             return;
         }
+        void Fire()
+        {
+            if (fireCount == 0)
+            {
+                Trigger.Trigger();
+                fireCount = fireCD;
+            }
+        }
         void DeseralizeMsg(string msg)
         {
+            msg = Me.CustomData;
             string[] messages = msg.Split('|');
             if (messages[0] != "Turret") return;
             switch(messages[1])
@@ -157,7 +184,8 @@ namespace SEScript
                     }
                 case "TargetPos":
                     {
-                        string[] pos = messages[1].Split('_');
+                        string[] pos = messages[2].Split('_');
+                        Echo(pos[0]);
                         float x = float.Parse(pos[0]);
                         float y = float.Parse(pos[1]);
                         float z = float.Parse(pos[2]);
@@ -167,7 +195,7 @@ namespace SEScript
                     }
                 case "Fire":
                     {
-                        Trigger.Trigger();
+                        Fire();
                         break;
                     }
                 case "Idle":
@@ -182,6 +210,7 @@ namespace SEScript
                         break;
                     }
             }
+            Me.CustomData = "";
         }
     }
 }

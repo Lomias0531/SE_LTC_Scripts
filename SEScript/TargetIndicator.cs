@@ -98,28 +98,43 @@ namespace SEScript
             HoriRot.TargetVelocityRPM = controller.RotationIndicator.X * -1;
             VertRot.TargetVelocityRPM = controller.RotationIndicator.Y;
 
-            SelectTarget();
+            TurretControls = new List<IMyProgrammableBlock>();
+            GridTerminalSystem.GetBlocksOfType(TurretControls);
+            if (TurretControls.Count == 0)
+            {
+                Echo("Turret Error");
+                return;
+            }
 
             if(controller.MoveIndicator.Y>0)
             {
                 FireCommand();
             }
+            if(controller.MoveIndicator.Y<0)
+            {
+                SelectTarget();
+            }
         }
         void SelectTarget()
         {
             Me.CustomData = "Indicator|SelectTarget";
-            Vector3D destination = (Vector3D)thisCam.Position + (Vector3D)thisCam.WorldMatrix.Forward * 4000;
-            MyDetectedEntityInfo target = thisCam.Raycast(destination);
+            //Vector3D destination = (Vector3D)thisCam.Position + (Vector3D)thisCam.WorldMatrix.Forward * 4000;
+            MyDetectedEntityInfo target = thisCam.Raycast(4000);
             if (target.IsEmpty())
             {
                 Echo("No target");
+                foreach (var turretControl in TurretControls)
+                {
+                    turretControl.CustomData = "Turret|Idle|";
+                }
+
                 return;
             }
 
-            Echo("Target Acquired");
+            Echo("Target Acquired " + target.Name);
             foreach (var turretControl in TurretControls)
             {
-                turretControl.CustomData = "Turret|TargetPos|" + target.HitPosition.Value.X.ToString() + "_" + target.HitPosition.Value.Y.ToString() + "_" + target.HitPosition.Value.ToString();
+                turretControl.CustomData = "Turret|TargetPos|" + target.HitPosition.Value.X.ToString() + "_" + target.HitPosition.Value.Y.ToString() + "_" + target.HitPosition.Value.Z.ToString();
             }
         }
         void FireCommand()
@@ -151,7 +166,7 @@ namespace SEScript
                         break;
                     }
             }
-            //Me.CustomData = "";
+            Me.CustomData = "";
         }
     }
 }
