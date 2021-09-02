@@ -48,6 +48,7 @@ namespace SEScript
                         return;
                     }
                     thisCam = cams[0];
+                    thisCam.EnableRaycast = true;
 
                     List<IMyRemoteControl> remotes = new List<IMyRemoteControl>();
                     group.GetBlocksOfType(remotes);
