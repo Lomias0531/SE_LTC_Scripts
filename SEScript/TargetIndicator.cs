@@ -15,9 +15,8 @@ namespace SEScript
         IMyMotorStator VertRot;
         IMyMotorStator HoriRot;
         IMyRemoteControl controller;
-        IMyRadioAntenna antenna;
         List<IMyProgrammableBlock> TurretControls;
-        void Main()
+        void Main(string msg)
         {
             if (!Checked)
             {
@@ -25,24 +24,24 @@ namespace SEScript
                 return;
             }
             ControlCam();
-            if(controller.CustomData == "SelectTarget")
-            {
-                SelectTarget();
-            }
+            DeseralizeMsg(msg);
         }
         void CheckComponents()
         {
             List<IMyTerminalBlock> terminal = new List<IMyTerminalBlock>();
             List<IMyBlockGroup> groups = new List<IMyBlockGroup>();
             GridTerminalSystem.GetBlockGroups(groups);
+            Echo(groups.Count.ToString());
             foreach (var group in groups)
             {
                 List<IMyTerminalBlock> terminals = new List<IMyTerminalBlock>();
                 group.GetBlocks(terminals);
                 if (terminals.Contains(Me as IMyTerminalBlock))
                 {
+                    Echo("EEE");
                     List<IMyCameraBlock> cams = new List<IMyCameraBlock>();
                     group.GetBlocksOfType(cams);
+                    Echo("Cam " + cams.Count.ToString());
                     if (cams.Count == 0)
                     {
                         Echo("Camera Error");
@@ -52,6 +51,7 @@ namespace SEScript
 
                     List<IMyRemoteControl> remotes = new List<IMyRemoteControl>();
                     group.GetBlocksOfType(remotes);
+                    Echo("Controller " + remotes.Count.ToString());
                     if (remotes.Count == 0)
                     {
                         Echo("Controller Error");
@@ -78,29 +78,23 @@ namespace SEScript
                         return;
                     }
                 }
+            }
 
-                TurretControls = new List<IMyProgrammableBlock>();
-                foreach (var item in terminals)
-                {
-                    if (item.CustomName == "LTC_TurretRemote")
-                    {
-                        TurretControls.Add(item as IMyProgrammableBlock);
-                    }
-                }
-
-                if (TurretControls.Count == 0)
-                {
-                    Echo("Turret Error");
-                    return;
-                }
-
-                Checked = true;
+            TurretControls = new List<IMyProgrammableBlock>();
+            GridTerminalSystem.GetBlocksOfType(TurretControls);
+            if (TurretControls.Count == 0)
+            {
+                Echo("Turret Error");
                 return;
             }
+
+            Checked = true;
+            Runtime.UpdateFrequency = UpdateFrequency.Update1;
+            return;
         }
         void ControlCam()
         {
-            HoriRot.TargetVelocityRPM = controller.RotationIndicator.X;
+            HoriRot.TargetVelocityRPM = controller.RotationIndicator.X * -1;
             VertRot.TargetVelocityRPM = controller.RotationIndicator.Y;
             if(controller.MoveIndicator.Y>0)
             {
@@ -113,32 +107,51 @@ namespace SEScript
         }
         void SelectTarget()
         {
-            MyDetectedEntityInfo target = thisCam.Raycast(4000);
+            Me.CustomData = "Indicator|SelectTarget";
+            Vector3D destination = (Vector3D)thisCam.Position + (Vector3D)thisCam.WorldMatrix.Forward * 4000;
+            MyDetectedEntityInfo target = thisCam.Raycast(destination);
             if (target.IsEmpty())
             {
+                Echo("No target");
                 return;
             }
 
+            Echo("Target Acquired");
             foreach (var turretControl in TurretControls)
             {
-                turretControl.CustomData = "TargetPos|" + target.HitPosition.Value.X.ToString() + "_" + target.HitPosition.Value.Y.ToString() + "_" + target.HitPosition.Value.ToString();
+                turretControl.CustomData = "Turret|TargetPos|" + target.HitPosition.Value.X.ToString() + "_" + target.HitPosition.Value.Y.ToString() + "_" + target.HitPosition.Value.ToString();
             }
         }
         void FireCommand()
         {
             foreach (var turretControl in TurretControls)
             {
-                turretControl.CustomData = "Fire|111";
+                turretControl.CustomData = "Turret|Fire|111";
             }
         }
-        void TrackingTarget()
+        void DeseralizeMsg(string msg)
         {
-            MyDetectedEntityInfo target = thisCam.Raycast(4000);
-            if (target.IsEmpty())
+            msg = Me.CustomData;
+            string[] message = msg.Split('|');
+            if (message[0] != "Indicator") return;
+            switch(message[1])
             {
-                return;
+                default:
+                    {
+                        return;
+                    }
+                case "Control":
+                    {
+                        controller.IsMainCockpit = true;
+                        break;
+                    }
+                case "SelectTarget":
+                    {
+                        SelectTarget();
+                        break;
+                    }
             }
-            IntergridCommunicationSystem.SendBroadcastMessage("TargetPos", target.HitPosition.Value.X.ToString() + "_" + target.HitPosition.Value.Y.ToString() + "_" + target.HitPosition.Value.ToString());
+            //Me.CustomData = "";
         }
     }
 }

@@ -147,37 +147,39 @@ namespace SEScript
         }
         void DeseralizeMsg(string msg)
         {
-            string[] messages = msg.Split("|");
-            switch(messages[0])
+            string[] messages = msg.Split('|');
+            if (messages[0] != "Turret") return;
+            switch(messages[1])
             {
                 default:
                     {
-                        return;
+                        break;
                     }
                 case "TargetPos":
                     {
-                        string[] pos = messages[1].Split("_");
+                        string[] pos = messages[1].Split('_');
                         float x = float.Parse(pos[0]);
                         float y = float.Parse(pos[1]);
                         float z = float.Parse(pos[2]);
                         targetPos = new Vector3D(x, y, z);
                         curStatus = TurretStatus.Aiming;
-                        return;
+                        break;
                     }
                 case "Fire":
                     {
                         Trigger.Trigger();
-                        return;
+                        break;
                     }
                 case "Idle":
                     {
                         curStatus = TurretStatus.Idle;
-                        return;
+                        break;
                     }
                 case "Manual":
                     {
                         curStatus = TurretStatus.Manual;
-                        return;
+                        remote.IsMainCockpit = true;
+                        break;
                     }
             }
         }
