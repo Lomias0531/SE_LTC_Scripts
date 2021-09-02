@@ -96,11 +96,10 @@ namespace SEScript
         {
             HoriRot.TargetVelocityRPM = controller.RotationIndicator.X * -1;
             VertRot.TargetVelocityRPM = controller.RotationIndicator.Y;
+
+            SelectTarget();
+
             if(controller.MoveIndicator.Y>0)
-            {
-                SelectTarget();
-            }
-            if(controller.MoveIndicator.Y<0)
             {
                 FireCommand();
             }
