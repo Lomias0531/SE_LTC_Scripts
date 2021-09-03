@@ -12,11 +12,18 @@ namespace SEScript
         IMyMotorStator VerticalRot;
         IMyMotorStator HorizontalRot;
         IMyMotorStator VerticalRev;
-        IMyTimerBlock Trigger;
+        IMyTimerBlock TriggerBlock;
         IMyRemoteControl remote;
+        List<IMyPistonBase> pistons = new List<IMyPistonBase>();
+        IMyMotorBase Trigger;
+        IMySmallGatlingGun gun;
+
         bool CheckReady = false;
         float fireCount = 0;
         float fireCD = 300f;
+
+        float reloadTime = 200f;
+        float reloadLength = 200f;
 
         Vector3D targetPos;
         TurretStatus curStatus = TurretStatus.Idle;
@@ -35,6 +42,9 @@ namespace SEScript
             }
             fireCount = (fireCount > 0) ? fireCount -= 1 : 0;
             Echo("Running");
+            Reload();
+            Echo("Fire: " + fireCount.ToString() + "/" + fireCD.ToString());
+            Echo("Reload: " + reloadTime.ToString() + "/" + reloadLength.ToString());
             DeseralizeMsg(msg);
             switch(curStatus)
             {
@@ -82,9 +92,9 @@ namespace SEScript
             {
                 Fire();
             }
-            VerticalRot.TargetVelocityRPM = (float)posAngle.Y * -5;
-            VerticalRev.TargetVelocityRPM = (float)posAngle.Y * 5;
-            HorizontalRot.TargetVelocityRPM = (float)posAngle.X * 5;
+            VerticalRot.TargetVelocityRPM = (float)posAngle.Y * -50;
+            VerticalRev.TargetVelocityRPM = (float)posAngle.Y * 50;
+            HorizontalRot.TargetVelocityRPM = (float)posAngle.X * 50;
         }
         void CheckComponents()
         {
@@ -123,13 +133,31 @@ namespace SEScript
                         continue;
                     }
                     HorizontalRot = vet[0];
-                    List<IMyTimerBlock> tim = new List<IMyTimerBlock>();
-                    group.GetBlocksOfType(tim, blocks => blocks.CustomName == "LTC_Trigger");
-                    if(tim.Count == 0)
+                    group.GetBlocksOfType(vet, blocks => blocks.CustomName == "Trigger");
+                    if(vet.Count == 0)
                     {
                         continue;
                     }
-                    Trigger = tim[0];
+                    Trigger = vet[0];
+                    List<IMyTimerBlock> tim = new List<IMyTimerBlock>();
+                    group.GetBlocksOfType(tim, blocks => blocks.CustomName == "LTC_Trigger");
+                    if (tim.Count == 0)
+                    {
+                        continue;
+                    }
+                    TriggerBlock = tim[0];
+                    group.GetBlocksOfType(pistons);
+                    if(pistons.Count == 0)
+                    {
+                        continue;
+                    }
+                    List<IMySmallGatlingGun> gat = new List<IMySmallGatlingGun>();
+                    group.GetBlocksOfType(gat);
+                    if(gat.Count == 0)
+                    {
+                        continue;
+                    }
+                    gun = gat[0];
                 }
             }
 
@@ -153,9 +181,24 @@ namespace SEScript
                 Echo("Horizontal");
                 return;
             }
+            //if(Trigger == null)
+            //{
+            //    Echo("Timer");
+            //    return;
+            //}
+            if(pistons.Count == 0)
+            {
+                Echo("Piston");
+                return;
+            }
             if(Trigger == null)
             {
-                Echo("Timer");
+                Echo("Trigger");
+                return;
+            }
+            if(gun == null)
+            {
+                Echo("Gun");
                 return;
             }
 
@@ -163,17 +206,49 @@ namespace SEScript
             CheckReady = true;
             return;
         }
+        void Reload()
+        {
+            if(reloadTime<reloadLength)
+            {
+                reloadTime += 1;
+                if(reloadTime == 1)
+                {
+                    foreach (IMyPistonBase pis in pistons)
+                    {
+                        pis.Reverse();
+                    }
+                    return;
+                }
+                if(reloadTime == 60)
+                {
+                    Trigger.Attach();
+                    return;
+                }
+                if(reloadTime == 61)
+                {
+                    foreach (IMyPistonBase pis in pistons)
+                    {
+                        pis.Reverse();
+                    }
+                    return;
+                }
+            }
+        }
         void Fire()
         {
-            if (fireCount == 0)
+            if (fireCount == 0 && reloadTime == reloadLength)
             {
-                Trigger.Trigger();
+                TriggerBlock.Trigger();
+                //gun.ApplyAction("ShootOnce");
+                //Trigger.Detach();
                 fireCount = fireCD;
+                reloadTime = 0;
             }
         }
         void DeseralizeMsg(string msg)
         {
-            msg = Me.CustomData;
+            if(string.IsNullOrEmpty(msg))
+                msg = Me.CustomData;
             string[] messages = msg.Split('|');
             if (messages[0] != "Turret") return;
             switch(messages[1])
@@ -210,7 +285,6 @@ namespace SEScript
                         break;
                     }
             }
-            Me.CustomData = "";
         }
     }
 }

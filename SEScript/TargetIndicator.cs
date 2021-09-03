@@ -112,19 +112,19 @@ namespace SEScript
             }
             if(controller.MoveIndicator.Y<0)
             {
-                SelectTarget();
+                Me.CustomData = "Indicator|SelectTarget";
             }
         }
         void SelectTarget()
         {
-            Me.CustomData = "Indicator|SelectTarget";
-            //Vector3D destination = (Vector3D)thisCam.Position + (Vector3D)thisCam.WorldMatrix.Forward * 4000;
+            //Me.CustomData = "Indicator|SelectTarget";
             MyDetectedEntityInfo target = thisCam.Raycast(4000);
             if (target.IsEmpty())
             {
                 Echo("No target");
                 foreach (var turretControl in TurretControls)
                 {
+                    if (turretControl == Me) continue;
                     turretControl.CustomData = "Turret|Idle|";
                 }
 
@@ -146,8 +146,15 @@ namespace SEScript
         }
         void DeseralizeMsg(string msg)
         {
-            msg = Me.CustomData;
-            string[] message = msg.Split('|');
+            string msg1 = "";
+            if(string.IsNullOrEmpty(msg))
+            {
+                msg1 = Me.CustomData;
+            }else
+            {
+                msg1 = msg; 
+            }
+            string[] message = msg1.Split('|');
             if (message[0] != "Indicator") return;
             switch(message[1])
             {
@@ -166,7 +173,8 @@ namespace SEScript
                         break;
                     }
             }
-            Me.CustomData = "";
+            if(string.IsNullOrEmpty(msg))
+                Me.CustomData = "";
         }
     }
 }
