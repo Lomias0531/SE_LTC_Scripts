@@ -17,6 +17,7 @@ namespace SEScript
         List<IMyPistonBase> pistons = new List<IMyPistonBase>();
         IMyMotorBase Trigger;
         IMySmallGatlingGun gun;
+        IMyCameraBlock IFF;
 
         bool CheckReady = false;
         float fireCount = 0;
@@ -158,6 +159,14 @@ namespace SEScript
                         continue;
                     }
                     gun = gat[0];
+                    List<IMyCameraBlock> cam = new List<IMyCameraBlock>();
+                    group.GetBlocksOfType(cam);
+                    if(cam.Count == 0)
+                    {
+                        continue;
+                    }
+                    IFF = cam[0];
+                    IFF.EnableRaycast = true;
                 }
             }
 
@@ -201,6 +210,11 @@ namespace SEScript
                 Echo("Gun");
                 return;
             }
+            if(IFF == null)
+            {
+                Echo("Camera");
+                return;
+            }
 
             Runtime.UpdateFrequency = UpdateFrequency.Update1;
             CheckReady = true;
@@ -236,6 +250,9 @@ namespace SEScript
         }
         void Fire()
         {
+            MyDetectedEntityInfo target = IFF.Raycast(500);
+            if (target.Relationship == VRage.Game.MyRelationsBetweenPlayerAndBlock.Owner)
+                return;
             if (fireCount == 0 && reloadTime == reloadLength)
             {
                 TriggerBlock.Trigger();
