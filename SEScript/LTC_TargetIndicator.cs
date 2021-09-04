@@ -8,14 +8,16 @@ using Sandbox.ModAPI.Interfaces;
 
 namespace SEScript
 {
-    class TargetIndicator : API
+    class LTC_TargetIndicator : API
     {
         bool Checked = false;
         IMyCameraBlock thisCam;
         IMyMotorStator VertRot;
         IMyMotorStator HoriRot;
         IMyRemoteControl controller;
-        List<IMyProgrammableBlock> TurretControls;
+        int controlCD = 0;
+        IMyProgrammableBlock FireControl;
+        MyDetectedEntityInfo SelectedTarget;
         void Main(string msg)
         {
             if (!Checked)
@@ -28,6 +30,7 @@ namespace SEScript
         }
         void CheckComponents()
         {
+            FireControl = GridTerminalSystem.GetBlockWithName("LTC_FireControl") as IMyProgrammableBlock;
             List<IMyTerminalBlock> terminal = new List<IMyTerminalBlock>();
             List<IMyBlockGroup> groups = new List<IMyBlockGroup>();
             GridTerminalSystem.GetBlockGroups(groups);
@@ -38,7 +41,6 @@ namespace SEScript
                 group.GetBlocks(terminals);
                 if (terminals.Contains(Me as IMyTerminalBlock))
                 {
-                    Echo("EEE");
                     List<IMyCameraBlock> cams = new List<IMyCameraBlock>();
                     group.GetBlocksOfType(cams);
                     Echo("Cam " + cams.Count.ToString());
@@ -81,14 +83,6 @@ namespace SEScript
                 }
             }
 
-            TurretControls = new List<IMyProgrammableBlock>();
-            GridTerminalSystem.GetBlocksOfType(TurretControls);
-            if (TurretControls.Count == 0)
-            {
-                Echo("Turret Error");
-                return;
-            }
-
             Checked = true;
             Runtime.UpdateFrequency = UpdateFrequency.Update1;
             return;
@@ -98,50 +92,24 @@ namespace SEScript
             HoriRot.TargetVelocityRPM = controller.RotationIndicator.X * -1;
             VertRot.TargetVelocityRPM = controller.RotationIndicator.Y;
 
-            TurretControls = new List<IMyProgrammableBlock>();
-            GridTerminalSystem.GetBlocksOfType(TurretControls);
-            if (TurretControls.Count == 0)
+            controlCD = controlCD < 1 ? 0 : controlCD -= 1;
+            if(controlCD == 0)
             {
-                Echo("Turret Error");
-                return;
-            }
-
-            if(controller.MoveIndicator.Y>0)
-            {
-                FireCommand();
-            }
-            if(controller.MoveIndicator.Y<0)
-            {
-                Me.CustomData = "Indicator|SelectTarget";
+                if (controller.MoveIndicator.Y < 0)
+                {
+                    SelectTarget();
+                    controlCD = 3;
+                }
             }
         }
         void SelectTarget()
         {
-            //Me.CustomData = "Indicator|SelectTarget";
-            MyDetectedEntityInfo target = thisCam.Raycast(4000);
-            if (target.IsEmpty())
+            SelectedTarget = thisCam.Raycast(4000);
+            if (SelectedTarget.IsEmpty())
             {
                 Echo("No target");
-                foreach (var turretControl in TurretControls)
-                {
-                    if (turretControl == Me) continue;
-                    turretControl.CustomData = "Turret|Idle|";
-                }
-
+                FireControl.CustomData += "FireControl|IndicatorIdle|+";
                 return;
-            }
-
-            Echo("Target Acquired " + target.Name);
-            foreach (var turretControl in TurretControls)
-            {
-                turretControl.CustomData = "Turret|TargetPos|" + target.HitPosition.Value.X.ToString() + "_" + target.HitPosition.Value.Y.ToString() + "_" + target.HitPosition.Value.Z.ToString();
-            }
-        }
-        void FireCommand()
-        {
-            foreach (var turretControl in TurretControls)
-            {
-                turretControl.CustomData = "Turret|Fire|111";
             }
         }
         void DeseralizeMsg(string msg)
@@ -154,6 +122,7 @@ namespace SEScript
             {
                 msg1 = msg; 
             }
+            controlCD = controlCD < 1 ? 0 : controlCD -= 1;
             string[] message = msg1.Split('|');
             if (message[0] != "Indicator") return;
             switch(message[1])
@@ -162,14 +131,24 @@ namespace SEScript
                     {
                         return;
                     }
-                case "Control":
+                case "TargetTurret":
                     {
-                        controller.IsMainCockpit = true;
+                        if(controlCD == 0)
+                        {
+                            SelectTarget();
+                            FireControl.CustomData += "FireControl|TurretAimAt|" + SelectedTarget.Position.X.ToString() + "_" + SelectedTarget.Position.Y.ToString() + "_" + SelectedTarget.Position.Z.ToString() + "|+";
+                            controlCD = 3;
+                        }
                         break;
                     }
-                case "SelectTarget":
+                case "TargetMissile":
                     {
-                        SelectTarget();
+                        if (controlCD == 0)
+                        {
+                            SelectTarget();
+                            FireControl.CustomData += "FireControl|MissileLaunchAt|" + SelectedTarget.Position.X.ToString() + "_" + SelectedTarget.Position.Y.ToString() + "_" + SelectedTarget.Position.Z.ToString() + "|+";
+                            controlCD = 3;
+                        }
                         break;
                     }
             }

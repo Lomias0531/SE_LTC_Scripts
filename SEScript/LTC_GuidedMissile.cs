@@ -1,5 +1,6 @@
 ﻿using Sandbox.ModAPI.Ingame;
 using Sandbox.ModAPI.Interfaces;
+using SpaceEngineers.Game.ModAPI;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -17,6 +18,7 @@ namespace SEScript
         List<IMyThrust> MainThu;
         List<IMyGyro> gyro;
         Vector3D TargetPos;
+        IMyShipMergeBlock LandingLock;
         void Main(string arg)
         {
             if(!CheckReady)
@@ -24,14 +26,16 @@ namespace SEScript
                 CheckComponent();
                 return;
             }
+            arg = Me.CustomData;
             if (!targetAcquired)
             {
                 string[] cmd = arg.Split('|');
-                if (cmd[0] != "TargetPos")
+                if (cmd[0] != "Missile")
                 {
                     return;
                 }
-                string[] targetPos = cmd[1].Split('_');
+                LandingLock.Enabled = false;
+                string[] targetPos = cmd[2].Split('_');
                 Echo(cmd[1]);
                 float x = float.Parse(targetPos[0]);
                 float y = float.Parse(targetPos[1]);
@@ -66,7 +70,7 @@ namespace SEScript
             {
                 List<IMyTerminalBlock> terminals = new List<IMyTerminalBlock>();
                 group.GetBlocks(terminals);
-                if(terminals.Contains(this as IMyTerminalBlock))
+                if(terminals.Contains(Me as IMyTerminalBlock))
                 {
                     List<IMyRemoteControl> Remote = new List<IMyRemoteControl>();
                     group.GetBlocksOfType(Remote);
@@ -78,7 +82,7 @@ namespace SEScript
                     CPU = Remote[0];
 
                     MainThu = new List<IMyThrust>();
-                    group.GetBlocksOfType(MainThu, blocks => blocks.Name == "Backwards");
+                    group.GetBlocksOfType(MainThu, blocks => blocks.CustomName == "Backwards");
                     foreach (var item in MainThu)
                     {
                         Echo(item.GridThrustDirection.ToString());
@@ -97,6 +101,16 @@ namespace SEScript
                         continue;
                     }
 
+                    List<IMyShipMergeBlock> merge = new List<IMyShipMergeBlock>();
+                    group.GetBlocksOfType(merge);
+                    if(merge.Count == 0)
+                    {
+                        Echo("Merge Error");
+                        continue;
+                    }
+                    LandingLock = merge[0];
+
+                    Echo("Check ready");
                     Runtime.UpdateFrequency = UpdateFrequency.Update1;
                     CheckReady = true;
                     return;
@@ -110,39 +124,9 @@ namespace SEScript
             Echo(posAngle.ToString());
             foreach (var Gyr in gyro)
             {
-                Gyr.SetValue("Pitch", (float)posAngle.Y * 60f);
-                Gyr.SetValue("Yaw", (float)posAngle.X * 60f);
+                Gyr.SetValue("Pitch", (float)posAngle.Y * -60f);
+                Gyr.SetValue("Yaw", (float)posAngle.X * -60f);
             }
         }
-
-        //List<IMyBlockGroup> groups;
-        //IMyMotorStator HorizontalRot;
-        //IMyMotorStator VecticalRot;
-        //void LTC_RotLookAt(IMyEntity block,Vector3D pos,IMyMotorStator HoriRot,IMyMotorStator VectRot)
-        //{
-        //    GridTerminalSystem.GetBlockGroups(groups);
-        //    foreach (var group in groups)
-        //    {
-        //        List<IMyTerminalBlock> terminals = new List<IMyTerminalBlock>();
-        //        group.GetBlocks(terminals);
-        //        if(terminals.Contains(block as IMyTerminalBlock))
-        //        {
-        //            foreach (var item in terminals)
-        //            {
-        //                if(item.CustomName == "Horizontal")
-        //                {
-        //                    HorizontalRot = item as IMyMotorStator;
-        //                    continue;
-        //                }
-        //                if(item.CustomName == "Vertical")
-        //                {
-        //                    VecticalRot = item as IMyMotorStator;
-        //                    continue;
-        //                }
-        //            }
-        //            break;
-        //        }
-        //    }
-        //}
     }
 }

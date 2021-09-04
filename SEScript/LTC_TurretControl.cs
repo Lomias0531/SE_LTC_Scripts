@@ -7,7 +7,7 @@ using VRageMath;
 
 namespace SEScript
 {
-    class TurretControl:API
+    class LTC_TurretControl:API
     {
         IMyMotorStator VerticalRot;
         IMyMotorStator HorizontalRot;
@@ -18,6 +18,8 @@ namespace SEScript
         IMyMotorBase Trigger;
         IMySmallGatlingGun gun;
         IMyCameraBlock IFF;
+        List<IMyShipWelder> wld = new List<IMyShipWelder>();
+        IMyProgrammableBlock FireControl;
 
         bool CheckReady = false;
         float fireCount = 0;
@@ -26,6 +28,8 @@ namespace SEScript
         float reloadTime = 200f;
         float reloadLength = 200f;
 
+        int AimingLag = 0;
+
         Vector3D targetPos;
         TurretStatus curStatus = TurretStatus.Idle;
         enum TurretStatus
@@ -33,6 +37,7 @@ namespace SEScript
             Aiming,
             Idle,
             Manual,
+            Auto,
         }
         void Main(string msg)
         {
@@ -51,18 +56,28 @@ namespace SEScript
             {
                 case TurretStatus.Aiming:
                     {
+                        Echo("Aiming");
                         Echo("Targeting " + targetPos.ToString());
                         AimByRotor();
                         break;
                     }
                 case TurretStatus.Idle:
                     {
+                        Echo("Idle");
                         RestorePos();
+                        FireControl.CustomData += "FireControl|TurretRequestTarget|" + Me.GetId() + "|+";
                         break;
                     }
                 case TurretStatus.Manual:
                     {
+                        Echo("Manual");
                         MoveByRotor();
+                        break;
+                    }
+                case TurretStatus.Auto:
+                    {
+                        Echo("Auto");
+                        AimByRotor();
                         break;
                     }
             }
@@ -79,12 +94,21 @@ namespace SEScript
         }
         void RestorePos()
         {
-            Vector3D restorePos = GridTerminalSystem.GetBlockWithName("MainControl").GetPosition() + GridTerminalSystem.GetBlockWithName("MainControl").WorldMatrix.Forward * 1000f;
+            Vector3D restorePos = HorizontalRot.GetPosition() + HorizontalRot.WorldMatrix.Forward * 1000f;
             LookAtDirection(restorePos, false);
             return;
         }
         void LookAtDirection(Vector3D pos,bool isFiring)
         {
+            Echo("Pos: " + pos.ToString());
+            Echo("Aim: " + AimingLag);
+            AimingLag += 1;
+            if(AimingLag>reloadLength && curStatus != TurretStatus.Aiming)
+            {
+                FireControl.CustomData += "FireControl|TurretRequestTarget|" + Me.GetId() + "|+";
+                AimingLag = 0;
+                return;
+            }
             MatrixD matrix = MatrixD.CreateLookAt(new Vector3D(), remote.WorldMatrix.Forward, remote.WorldMatrix.Up);
             Vector3D posAngle = Vector3D.Normalize(Vector3D.TransformNormal(pos - remote.GetPosition(), matrix));
             double distance = Vector3D.Distance(remote.GetPosition(), pos);
@@ -99,6 +123,8 @@ namespace SEScript
         }
         void CheckComponents()
         {
+            FireControl = GridTerminalSystem.GetBlockWithName("LTC_FireControl") as IMyProgrammableBlock;
+            FireControl.CustomData += "FireControl|RegisterTurret" + Me.GetId() + "|+";
             List<IMyBlockGroup> groups = new List<IMyBlockGroup>();
             GridTerminalSystem.GetBlockGroups(groups);
             foreach (var group in groups)
@@ -167,6 +193,11 @@ namespace SEScript
                     }
                     IFF = cam[0];
                     IFF.EnableRaycast = true;
+                    group.GetBlocksOfType(wld);
+                    if(wld.Count == 0)
+                    {
+                        continue;
+                    }
                 }
             }
 
@@ -190,11 +221,6 @@ namespace SEScript
                 Echo("Horizontal");
                 return;
             }
-            //if(Trigger == null)
-            //{
-            //    Echo("Timer");
-            //    return;
-            //}
             if(pistons.Count == 0)
             {
                 Echo("Piston");
@@ -215,6 +241,11 @@ namespace SEScript
                 Echo("Camera");
                 return;
             }
+            if(wld.Count == 0)
+            {
+                Echo("Welder");
+                return;
+            }
 
             Runtime.UpdateFrequency = UpdateFrequency.Update1;
             CheckReady = true;
@@ -225,7 +256,7 @@ namespace SEScript
             if(reloadTime<reloadLength)
             {
                 reloadTime += 1;
-                if(reloadTime == 1)
+                if(reloadTime == 10)
                 {
                     foreach (IMyPistonBase pis in pistons)
                     {
@@ -233,18 +264,25 @@ namespace SEScript
                     }
                     return;
                 }
-                if(reloadTime == 60)
+                if(reloadTime == 90)
                 {
                     Trigger.Attach();
                     return;
                 }
-                if(reloadTime == 61)
+                if(reloadTime == 100)
                 {
                     foreach (IMyPistonBase pis in pistons)
                     {
                         pis.Reverse();
                     }
                     return;
+                }
+                if(reloadTime == 110)
+                {
+                    foreach (var welder in wld)
+                    {
+                        welder.Enabled = true;
+                    }
                 }
             }
         }
@@ -256,10 +294,22 @@ namespace SEScript
             if (fireCount == 0 && reloadTime == reloadLength)
             {
                 TriggerBlock.Trigger();
-                //gun.ApplyAction("ShootOnce");
-                //Trigger.Detach();
                 fireCount = fireCD;
                 reloadTime = 0;
+                foreach (var welder in wld)
+                {
+                    welder.Enabled = false;
+                }
+                AimingLag = 0;
+            }
+            else
+            {
+                return;
+            }
+            if(curStatus == TurretStatus.Auto || curStatus == TurretStatus.Idle)
+            {
+                curStatus = TurretStatus.Idle;
+                FireControl.CustomData += "FireControl|TurretRequestTarget|" + Me.GetId() + "|+";
             }
         }
         void DeseralizeMsg(string msg)
@@ -274,7 +324,7 @@ namespace SEScript
                     {
                         break;
                     }
-                case "TargetPos":
+                case "KeepTarget":
                     {
                         string[] pos = messages[2].Split('_');
                         Echo(pos[0]);
@@ -283,11 +333,6 @@ namespace SEScript
                         float z = float.Parse(pos[2]);
                         targetPos = new Vector3D(x, y, z);
                         curStatus = TurretStatus.Aiming;
-                        break;
-                    }
-                case "Fire":
-                    {
-                        Fire();
                         break;
                     }
                 case "Idle":
@@ -301,7 +346,19 @@ namespace SEScript
                         remote.IsMainCockpit = true;
                         break;
                     }
+                case "Target":
+                    {
+                        string[] pos = messages[2].Split('_');
+                        Echo(pos[0]);
+                        float x = float.Parse(pos[0]);
+                        float y = float.Parse(pos[1]);
+                        float z = float.Parse(pos[2]);
+                        targetPos = new Vector3D(x, y, z);
+                        curStatus = TurretStatus.Auto;
+                        break;
+                    }
             }
+            Me.CustomData = "";
         }
     }
 }
