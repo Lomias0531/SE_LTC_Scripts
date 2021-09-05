@@ -34,6 +34,7 @@ namespace SEScript
             ExecuteCommands(arg);
             Echo("Turrets: " + Turrets.Count);
             Echo("Targets: " + TargetDic.Count);
+            Echo("PointDefenses: " + PointDefenses.Count);
         }
         void CheckComponents()
         {
@@ -217,7 +218,7 @@ namespace SEScript
                         {
                             if (item.GetId() == long.Parse(curCmd[2]))
                             {
-                                item.CustomData = "Turret|Target|" + TargetDic[index].Position.X + "_" + TargetDic[index].Position.Y + "_" + TargetDic[index].Position.Z;
+                                item.CustomData = "PointDefense|Target|" + TargetDic[index].Position.X + "_" + TargetDic[index].Position.Y + "_" + TargetDic[index].Position.Z;
                             }
                         }
                         break;

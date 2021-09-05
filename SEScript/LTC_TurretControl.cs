@@ -290,7 +290,10 @@ namespace SEScript
         {
             MyDetectedEntityInfo target = IFF.Raycast(500);
             if (target.Relationship == VRage.Game.MyRelationsBetweenPlayerAndBlock.Owner)
+            {
+                FireControl.CustomData += "FireControl|TurretRequestTarget|" + Me.GetId() + "|+";
                 return;
+            }
             if (fireCount == 0 && reloadTime == reloadLength)
             {
                 TriggerBlock.Trigger();
