@@ -100,6 +100,7 @@ namespace SEScript
         }
         void LookAtDirection(Vector3D pos,bool isFiring)
         {
+            if (reloadTime < 10) return;
             Echo("Pos: " + pos.ToString());
             Echo("Aim: " + AimingLag);
             AimingLag += 1;

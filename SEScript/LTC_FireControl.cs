@@ -12,7 +12,9 @@ namespace SEScript
         List<IMyProgrammableBlock> MissileLaunchers;
         List<IMyLargeTurretBase> AutoWeapons;
 
-        List<MyDetectedEntityInfo> TargetDic;
+        List<MyDetectedEntityInfo> ShortRangeScanTargets;
+        List<MyDetectedEntityInfo> LongRangeScanTargets;
+        List<MyDetectedEntityInfo> AllScanTargets;
         List<IMyProgrammableBlock> Turrets;
         List<IMyProgrammableBlock> PointDefenses;
         Queue<string> commandQueue;
@@ -34,7 +36,7 @@ namespace SEScript
                 CheckComponents();
             }
             ExecuteCommands(arg);
-            Echo("Targets: " + TargetDic.Count);
+            Echo("Targets: " + AllScanTargets.Count);
             Echo("Turrets: " + Turrets.Count);
             Echo("PointDefenses: " + PointDefenses.Count);
             Echo("Scan: " + ScanCount);
@@ -42,6 +44,13 @@ namespace SEScript
             List<IMyCameraBlock> cams = new List<IMyCameraBlock>();
             GridTerminalSystem.GetBlocksOfType(cams);
             Echo("Cams: " + cams.Count);
+            switch(curMode)
+            {
+                default:
+                    {
+                        break;
+                    }
+            }
         }
         void CheckComponents()
         {
@@ -49,7 +58,9 @@ namespace SEScript
             Indicators = new List<IMyProgrammableBlock>();
             MissileLaunchers = new List<IMyProgrammableBlock>();
             AutoWeapons = new List<IMyLargeTurretBase>();
-            TargetDic = new List<MyDetectedEntityInfo>();
+            ShortRangeScanTargets = new List<MyDetectedEntityInfo>();
+            LongRangeScanTargets = new List<MyDetectedEntityInfo>();
+            AllScanTargets = new List<MyDetectedEntityInfo>();
             Turrets = new List<IMyProgrammableBlock>();
             PointDefenses = new List<IMyProgrammableBlock>();
             commandQueue = new Queue<string>();
@@ -93,25 +104,36 @@ namespace SEScript
         }
         void AcquireTargets()
         {
-            TargetDic.Clear();
+            ShortRangeScanTargets.Clear();
             foreach (IMyLargeTurretBase tut in AutoWeapons)
             {
                 MyDetectedEntityInfo target = tut.GetTargetedEntity();
                 if(target.Relationship == VRage.Game.MyRelationsBetweenPlayerAndBlock.Enemies)
-                    TargetDic.Add(target);
+                    ShortRangeScanTargets.Add(target);
             }
-            if(TargetDic.Count > 0)
+            if(AllScanTargets.Count > 0)
             {
-                ScanCD = 10;
+                ScanCD = 1;
             }else
             {
                 ScanCD = 100;
             }
-            CamScan();
+            LongRangeScan();
+            AllScanTargets.Clear();
+            foreach (var item in ShortRangeScanTargets)
+            {
+                AllScanTargets.Add(item);
+            }
+            foreach (var item in LongRangeScanTargets)
+            {
+                AllScanTargets.Add(item);
+            }
         }
-        void CamScan()
+        //长程扫描，由于消耗较多电力，因此设定有扫描期限
+        void LongRangeScan()
         {
             if (ScanCount > 0) return;
+            LongRangeScanTargets.Clear();
             ScanCount = ScanCD;
             List<IMyCameraBlock> cams = new List<IMyCameraBlock>();
             GridTerminalSystem.GetBlocksOfType(cams);
@@ -119,15 +141,15 @@ namespace SEScript
             foreach (var cam in cams)
             {
                 cam.EnableRaycast = true;
-                for(float offsetX = -90; offsetX <= 90; offsetX+=3)
+                for(int i = 0;i<3000;i++)
                 {
-                    for(float offsetY = -90;offsetY<=90;offsetY+=3)
+                    float X = rnd.Next(-9000, 9000) / 100f;
+                    float Y = rnd.Next(-9000, 9000) / 100f;
+                    MyDetectedEntityInfo tar = cam.Raycast(4000, X, Y);
+                    if (!tar.IsEmpty())
                     {
-                        MyDetectedEntityInfo tar = cam.Raycast(4000, offsetX, offsetY);
-                        if(!tar.IsEmpty())
-                        {
-                            TargetDic.Add(tar);
-                        }
+                        if((tar.Relationship == VRage.Game.MyRelationsBetweenPlayerAndBlock.Enemies))
+                            LongRangeScanTargets.Add(tar);
                     }
                 }
             }
@@ -151,11 +173,15 @@ namespace SEScript
                 return;
             }
             AcquireTargets();
-            if (TargetDic.Count == 0)
+            if (AllScanTargets.Count == 0)
             {
                 foreach (var item in Turrets)
                 {
                     item.CustomData = "Turret|Idle|";
+                }
+                foreach (var item in PointDefenses)
+                {
+                    item.CustomData = "PointDefense|Idle|";
                 }
             }
             //处理命令
@@ -216,7 +242,7 @@ namespace SEScript
                 case "TurretRequestTarget": //炮塔申请目标
                     {
                         AcquireTargets();
-                        if (TargetDic.Count == 0)
+                        if (AllScanTargets.Count == 0)
                         {
                             foreach (var item in Turrets)
                             {
@@ -227,12 +253,12 @@ namespace SEScript
                             }
                             break;
                         }
-                        int index = rnd.Next(0, TargetDic.Count - 1);
+                        int index = rnd.Next(0, AllScanTargets.Count - 1);
                         foreach (var item in Turrets)
                         {
                             if(item.GetId() == long.Parse(curCmd[2]))
                             {
-                                item.CustomData = "Turret|Target|" + TargetDic[index].Position.X + "_" + TargetDic[index].Position.Y + "_" + TargetDic[index].Position.Z;
+                                item.CustomData = "Turret|Target|" + AllScanTargets[index].Position.X + "_" + AllScanTargets[index].Position.Y + "_" + AllScanTargets[index].Position.Z;
                             }
                         }
                         break;
@@ -240,7 +266,7 @@ namespace SEScript
                 case "PointDefenseRequestTarget": //点防御申请目标
                     {
                         AcquireTargets();
-                        if (TargetDic.Count == 0)
+                        if (ShortRangeScanTargets.Count == 0)
                         {
                             foreach (var item in PointDefenses)
                             {
@@ -251,12 +277,12 @@ namespace SEScript
                             }
                             break;
                         }
-                        int index = rnd.Next(0, TargetDic.Count - 1);
+                        int index = rnd.Next(0, ShortRangeScanTargets.Count - 1);
                         foreach (var item in PointDefenses)
                         {
                             if (item.GetId() == long.Parse(curCmd[2]))
                             {
-                                item.CustomData = "PointDefense|Target|" + TargetDic[index].Position.X + "_" + TargetDic[index].Position.Y + "_" + TargetDic[index].Position.Z;
+                                item.CustomData = "PointDefense|Target|" + ShortRangeScanTargets[index].Position.X + "_" + ShortRangeScanTargets[index].Position.Y + "_" + ShortRangeScanTargets[index].Position.Z;
                             }
                         }
                         break;
