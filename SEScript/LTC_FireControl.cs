@@ -19,6 +19,8 @@ namespace SEScript
         WeaponMode curMode = WeaponMode.Auto;
         bool CheckReady = false;
         Random rnd;
+        int ScanCD = 100;
+        int ScanCount = 0;
         enum WeaponMode
         {
             Manual,
@@ -32,9 +34,14 @@ namespace SEScript
                 CheckComponents();
             }
             ExecuteCommands(arg);
-            Echo("Turrets: " + Turrets.Count);
             Echo("Targets: " + TargetDic.Count);
+            Echo("Turrets: " + Turrets.Count);
             Echo("PointDefenses: " + PointDefenses.Count);
+            Echo("Scan: " + ScanCount);
+            ScanCount = ScanCount > 0 ? ScanCount -= 1 : 0;
+            List<IMyCameraBlock> cams = new List<IMyCameraBlock>();
+            GridTerminalSystem.GetBlocksOfType(cams);
+            Echo("Cams: " + cams.Count);
         }
         void CheckComponents()
         {
@@ -92,6 +99,37 @@ namespace SEScript
                 MyDetectedEntityInfo target = tut.GetTargetedEntity();
                 if(target.Relationship == VRage.Game.MyRelationsBetweenPlayerAndBlock.Enemies)
                     TargetDic.Add(target);
+            }
+            if(TargetDic.Count > 0)
+            {
+                ScanCD = 10;
+            }else
+            {
+                ScanCD = 100;
+            }
+            CamScan();
+        }
+        void CamScan()
+        {
+            if (ScanCount > 0) return;
+            ScanCount = ScanCD;
+            List<IMyCameraBlock> cams = new List<IMyCameraBlock>();
+            GridTerminalSystem.GetBlocksOfType(cams);
+            
+            foreach (var cam in cams)
+            {
+                cam.EnableRaycast = true;
+                for(float offsetX = -90; offsetX <= 90; offsetX+=3)
+                {
+                    for(float offsetY = -90;offsetY<=90;offsetY+=3)
+                    {
+                        MyDetectedEntityInfo tar = cam.Raycast(4000, offsetX, offsetY);
+                        if(!tar.IsEmpty())
+                        {
+                            TargetDic.Add(tar);
+                        }
+                    }
+                }
             }
         }
         void ExecuteCommands(string msg)
@@ -252,7 +290,7 @@ namespace SEScript
                     {
                         foreach (var item in Turrets)
                         {
-                            item.CustomData = "Turret|Idle";
+                            item.CustomData = "Turret|Restore";
                         }
                         break;
                     }

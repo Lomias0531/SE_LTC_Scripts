@@ -136,8 +136,11 @@ namespace SEScript
                         if(controlCD == 0)
                         {
                             SelectTarget();
-                            FireControl.CustomData += "FireControl|TurretAimAt|" + SelectedTarget.Position.X.ToString() + "_" + SelectedTarget.Position.Y.ToString() + "_" + SelectedTarget.Position.Z.ToString() + "|+";
-                            controlCD = 3;
+                            if(!SelectedTarget.IsEmpty())
+                            {
+                                FireControl.CustomData += "FireControl|TurretAimAt|" + SelectedTarget.Position.X.ToString() + "_" + SelectedTarget.Position.Y.ToString() + "_" + SelectedTarget.Position.Z.ToString() + "|+";
+                                controlCD = 3;
+                            }
                         }
                         break;
                     }
@@ -146,8 +149,11 @@ namespace SEScript
                         if (controlCD == 0)
                         {
                             SelectTarget();
-                            FireControl.CustomData += "FireControl|MissileLaunchAt|" + SelectedTarget.Position.X.ToString() + "_" + SelectedTarget.Position.Y.ToString() + "_" + SelectedTarget.Position.Z.ToString() + "|+";
-                            controlCD = 3;
+                            if(!SelectedTarget.IsEmpty())
+                            {
+                                FireControl.CustomData += "FireControl|MissileLaunchAt|" + SelectedTarget.Position.X.ToString() + "_" + SelectedTarget.Position.Y.ToString() + "_" + SelectedTarget.Position.Z.ToString() + "|+";
+                                controlCD = 3;
+                            }
                         }
                         break;
                     }

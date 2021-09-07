@@ -21,14 +21,14 @@ namespace SEScript
         List<IMyShipWelder> wld = new List<IMyShipWelder>();
         IMyProgrammableBlock FireControl;
 
-        bool CheckReady = false;
-        float fireCount = 0;
-        float fireCD = 300f;
+        bool CheckReady = false; //组件初始化
+        float fireCount = 0; //开火计数
+        float fireCD = 300f; //开火冷却，避免因为下一发炮弹刷新掉前一发
 
-        float reloadTime = 200f;
-        float reloadLength = 200f;
+        float reloadTime = 200f; //装弹计数
+        float reloadLength = 200f; //装弹冷却
 
-        int AimingLag = 0;
+        int AimingLag = 0; //开火阻碍倒计时，若长时间无法击发则重新申请目标
 
         Vector3D targetPos;
         TurretStatus curStatus = TurretStatus.Idle;
@@ -340,7 +340,8 @@ namespace SEScript
                     }
                 case "Idle":
                     {
-                        curStatus = TurretStatus.Idle;
+                        if (curStatus != TurretStatus.Aiming)
+                            curStatus = TurretStatus.Idle;
                         break;
                     }
                 case "Manual":
@@ -358,6 +359,11 @@ namespace SEScript
                         float z = float.Parse(pos[2]);
                         targetPos = new Vector3D(x, y, z);
                         curStatus = TurretStatus.Auto;
+                        break;
+                    }
+                case "Restore":
+                    {
+                        curStatus = TurretStatus.Idle;
                         break;
                     }
             }
