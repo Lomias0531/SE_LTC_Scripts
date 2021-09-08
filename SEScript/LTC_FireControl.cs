@@ -23,12 +23,15 @@ namespace SEScript
         Random rnd;
         int ScanCD = 100;
         int ScanCount = 0;
+        int ScanOffsetX;
+        int ScanOffsetY;
         enum WeaponMode
         {
             Manual,
             Auto,
             Halt,
         }
+        List<VRage.Game.MyRelationsBetweenPlayerAndBlock> TargetFilter = new List<VRage.Game.MyRelationsBetweenPlayerAndBlock>() { VRage.Game.MyRelationsBetweenPlayerAndBlock.Enemies};
         void Main(string arg)
         {
             if(!CheckReady)
@@ -108,17 +111,16 @@ namespace SEScript
             foreach (IMyLargeTurretBase tut in AutoWeapons)
             {
                 MyDetectedEntityInfo target = tut.GetTargetedEntity();
-                if(target.Relationship == VRage.Game.MyRelationsBetweenPlayerAndBlock.Enemies)
+                if(TargetFilter.Contains(target.Relationship))
                     ShortRangeScanTargets.Add(target);
             }
             if(AllScanTargets.Count > 0)
             {
-                ScanCD = 1;
+                LongRangeDetailedScan();
             }else
             {
-                ScanCD = 100;
+                LongRangeSimpleScan();
             }
-            LongRangeScan();
             AllScanTargets.Clear();
             foreach (var item in ShortRangeScanTargets)
             {
@@ -129,10 +131,13 @@ namespace SEScript
                 AllScanTargets.Add(item);
             }
         }
-        //长程扫描，由于消耗较多电力，因此设定有扫描期限
-        void LongRangeScan()
+        //长程简单扫描，由于消耗较多电力，因此设定有扫描期限
+        void LongRangeSimpleScan()
         {
-            if (ScanCount > 0) return;
+            if (ScanCount > 0)
+            {
+                return;
+            }
             LongRangeScanTargets.Clear();
             ScanCount = ScanCD;
             List<IMyCameraBlock> cams = new List<IMyCameraBlock>();
@@ -141,15 +146,67 @@ namespace SEScript
             foreach (var cam in cams)
             {
                 cam.EnableRaycast = true;
-                for(int i = 0;i<3000;i++)
+                for(int i = 0;i<5000;i++)
                 {
                     float X = rnd.Next(-9000, 9000) / 100f;
                     float Y = rnd.Next(-9000, 9000) / 100f;
                     MyDetectedEntityInfo tar = cam.Raycast(4000, X, Y);
                     if (!tar.IsEmpty())
                     {
-                        if((tar.Relationship == VRage.Game.MyRelationsBetweenPlayerAndBlock.Enemies))
+                        if(TargetFilter.Contains(tar.Relationship))
                             LongRangeScanTargets.Add(tar);
+                    }
+                }
+            }
+        }
+        //长程详细扫描，在之前检测到有敌对目标时进行，将持续性消耗大量电力
+        void LongRangeDetailedScan()
+        {
+            ScanOffsetX += 1;
+            List<IMyCameraBlock> cams = new List<IMyCameraBlock>();
+            GridTerminalSystem.GetBlocksOfType(cams);
+            if (ScanOffsetX>20)
+            {
+                ScanOffsetX = 0;
+                ScanOffsetY += 1;
+                if(ScanOffsetY > 20)
+                {
+                    ScanOffsetY = 0;
+                    for (int i = LongRangeScanTargets.Count - 1; i >= 0; i--)
+                    {
+                        bool foundThis = false;
+                        foreach (var cam in cams)
+                        {
+                            MyDetectedEntityInfo detect = cam.Raycast(LongRangeScanTargets[i].Position);
+                            if (!detect.IsEmpty())
+                            {
+                                foundThis = true;
+                                break;
+                            }
+                        }
+                        if (!foundThis)
+                        {
+                            LongRangeScanTargets.RemoveAt(i);
+                        }
+                    }
+                }
+            }
+
+            foreach (var cam in cams)
+            {
+                cam.EnableRaycast = true;
+                for(float offsetx = -90; offsetx < 90; offsetx += 6)
+                {
+                    for(float offsety = -90; offsety<90;offsety +=6)
+                    {
+                        MyDetectedEntityInfo tar = cam.Raycast(4000, offsetx + ScanOffsetX * 0.15f, offsety + ScanOffsetY * 0.15f);
+                        if(!tar.IsEmpty())
+                        {
+                            if((tar.Relationship == VRage.Game.MyRelationsBetweenPlayerAndBlock.Enemies) && !LongRangeScanTargets.Contains(tar))
+                            {
+                                LongRangeScanTargets.Add(tar);
+                            }
+                        }
                     }
                 }
             }
@@ -258,7 +315,7 @@ namespace SEScript
                         {
                             if(item.GetId() == long.Parse(curCmd[2]))
                             {
-                                item.CustomData = "Turret|Target|" + AllScanTargets[index].Position.X + "_" + AllScanTargets[index].Position.Y + "_" + AllScanTargets[index].Position.Z;
+                                item.CustomData = "Turret|Target|" + AllScanTargets[index].Position.X + "_" + AllScanTargets[index].Position.Y + "_" + AllScanTargets[index].Position.Z + "_" + AllScanTargets[index].Velocity.X + "_" + AllScanTargets[index].Velocity.Y + "_" + AllScanTargets[index].Velocity.Z;
                             }
                         }
                         break;
@@ -317,6 +374,27 @@ namespace SEScript
                         foreach (var item in Turrets)
                         {
                             item.CustomData = "Turret|Restore";
+                        }
+                        break;
+                    }
+                case "TargetFilter":
+                    {
+                        switch(curCmd[2])
+                        {
+                            case "Enemies":
+                                {
+                                    TargetFilter.Clear();
+                                    TargetFilter.Add(VRage.Game.MyRelationsBetweenPlayerAndBlock.Enemies);
+                                    break;
+                                }
+                            case "All":
+                                {
+                                    TargetFilter.Clear();
+                                    TargetFilter.Add(VRage.Game.MyRelationsBetweenPlayerAndBlock.Enemies);
+                                    TargetFilter.Add(VRage.Game.MyRelationsBetweenPlayerAndBlock.Neutral);
+                                    TargetFilter.Add(VRage.Game.MyRelationsBetweenPlayerAndBlock.NoOwnership);
+                                    break;
+                                }
                         }
                         break;
                     }

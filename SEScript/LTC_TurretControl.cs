@@ -31,6 +31,8 @@ namespace SEScript
         int AimingLag = 0; //开火阻碍倒计时，若长时间无法击发则重新申请目标
 
         Vector3D targetPos;
+        Vector3D targetVel;
+        float shellSpeed = 200f;
         TurretStatus curStatus = TurretStatus.Idle;
         enum TurretStatus
         {
@@ -90,7 +92,21 @@ namespace SEScript
         }
         void AimByRotor()
         {
-            LookAtDirection(targetPos, true);
+            LookAtDirection(CalculateCollisionPos(), true);
+        }
+        Vector3D CalculateCollisionPos()
+        {
+            //此处借鉴于MEA预瞄算法
+            Vector3D hitPos;
+            double hitTime;
+            hitTime = Vector3D.Distance(Me.GetPosition(), targetPos) / shellSpeed + 0.1;
+            hitPos = targetPos + targetVel * hitTime;
+            for(int i = 0;i<3;i++)
+            {
+                hitTime = Vector3D.Distance(Me.GetPosition(), hitPos) / shellSpeed;
+                hitPos = targetPos + targetVel * hitTime;
+            }
+            return hitPos;
         }
         void RestorePos()
         {
@@ -335,7 +351,11 @@ namespace SEScript
                         float x = float.Parse(pos[0]);
                         float y = float.Parse(pos[1]);
                         float z = float.Parse(pos[2]);
+                        float vx = float.Parse(pos[3]);
+                        float vy = float.Parse(pos[4]);
+                        float vz = float.Parse(pos[5]);
                         targetPos = new Vector3D(x, y, z);
+                        targetVel = new Vector3D(vx, vy, vz);
                         curStatus = TurretStatus.Aiming;
                         break;
                     }
@@ -358,7 +378,11 @@ namespace SEScript
                         float x = float.Parse(pos[0]);
                         float y = float.Parse(pos[1]);
                         float z = float.Parse(pos[2]);
+                        float vx = float.Parse(pos[3]);
+                        float vy = float.Parse(pos[4]);
+                        float vz = float.Parse(pos[5]);
                         targetPos = new Vector3D(x, y, z);
+                        targetVel = new Vector3D(vx, vy, vz);
                         curStatus = TurretStatus.Auto;
                         break;
                     }
