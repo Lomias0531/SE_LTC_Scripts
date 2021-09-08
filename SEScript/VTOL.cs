@@ -72,7 +72,7 @@ namespace SEScript
             }
             foreach (var thrust in VTOLThrust)
             {
-                thrust.ThrustOverride = (float)MainControl.GetShipSpeed() * 10;
+                thrust.ThrustOverridePercentage = (float)MainControl.GetShipSpeed()/100f;
             }
         }
         void ManualControl()
