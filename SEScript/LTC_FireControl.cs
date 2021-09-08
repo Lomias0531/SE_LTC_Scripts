@@ -44,9 +44,7 @@ namespace SEScript
             Echo("PointDefenses: " + PointDefenses.Count);
             Echo("Scan: " + ScanCount);
             ScanCount = ScanCount > 0 ? ScanCount -= 1 : 0;
-            List<IMyCameraBlock> cams = new List<IMyCameraBlock>();
-            GridTerminalSystem.GetBlocksOfType(cams);
-            Echo("Cams: " + cams.Count);
+            Echo("Cams: " + GetAvailableScanner().Count);
             switch(curMode)
             {
                 default:
@@ -140,16 +138,14 @@ namespace SEScript
             }
             LongRangeScanTargets.Clear();
             ScanCount = ScanCD;
-            List<IMyCameraBlock> cams = new List<IMyCameraBlock>();
-            GridTerminalSystem.GetBlocksOfType(cams);
             
-            foreach (var cam in cams)
+            foreach (var cam in GetAvailableScanner())
             {
                 cam.EnableRaycast = true;
-                for(int i = 0;i<5000;i++)
+                for(int i = 0;i<8000;i++)
                 {
-                    float X = rnd.Next(-9000, 9000) / 100f;
-                    float Y = rnd.Next(-9000, 9000) / 100f;
+                    float X = (float)(rnd.Next(-90000, 90000) / 1000f);
+                    float Y = (float)(rnd.Next(-90000, 90000) / 1000f);
                     MyDetectedEntityInfo tar = cam.Raycast(4000, X, Y);
                     if (!tar.IsEmpty())
                     {
@@ -163,8 +159,7 @@ namespace SEScript
         void LongRangeDetailedScan()
         {
             ScanOffsetX += 1;
-            List<IMyCameraBlock> cams = new List<IMyCameraBlock>();
-            GridTerminalSystem.GetBlocksOfType(cams);
+            List<IMyCameraBlock> scanners = GetAvailableScanner();
             if (ScanOffsetX>20)
             {
                 ScanOffsetX = 0;
@@ -175,7 +170,7 @@ namespace SEScript
                     for (int i = LongRangeScanTargets.Count - 1; i >= 0; i--)
                     {
                         bool foundThis = false;
-                        foreach (var cam in cams)
+                        foreach (var cam in scanners)
                         {
                             MyDetectedEntityInfo detect = cam.Raycast(LongRangeScanTargets[i].Position);
                             if (!detect.IsEmpty())
@@ -192,12 +187,12 @@ namespace SEScript
                 }
             }
 
-            foreach (var cam in cams)
+            foreach (var cam in scanners)
             {
                 cam.EnableRaycast = true;
-                for(float offsetx = -90; offsetx < 90; offsetx += 6)
+                for(float offsetx = -90; offsetx < 90; offsetx += 3)
                 {
-                    for(float offsety = -90; offsety<90;offsety +=6)
+                    for(float offsety = -90; offsety<90;offsety +=3)
                     {
                         MyDetectedEntityInfo tar = cam.Raycast(4000, offsetx + ScanOffsetX * 0.15f, offsety + ScanOffsetY * 0.15f);
                         if(!tar.IsEmpty())
@@ -210,6 +205,12 @@ namespace SEScript
                     }
                 }
             }
+        }
+        List<IMyCameraBlock> GetAvailableScanner()
+        {
+            List<IMyCameraBlock> cams = new List<IMyCameraBlock>();
+            GridTerminalSystem.GetBlocksOfType(cams, blocks => blocks.CustomName.Contains("Scanner"));
+            return cams;
         }
         void ExecuteCommands(string msg)
         {
