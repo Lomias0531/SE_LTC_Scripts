@@ -32,7 +32,7 @@ namespace SEScript
 
         Vector3D targetPos;
         Vector3D targetVel;
-        float shellSpeed = 200f;
+        float shellSpeed = 265.17f;
         TurretStatus curStatus = TurretStatus.Idle;
         enum TurretStatus
         {
@@ -389,6 +389,11 @@ namespace SEScript
                 case "Restore":
                     {
                         curStatus = TurretStatus.Idle;
+                        break;
+                    }
+                case "Fire":
+                    {
+                        Fire();
                         break;
                     }
             }

@@ -26,6 +26,7 @@ namespace SEScript
                 return;
             }
             ControlCam();
+            Echo("Running");
             DeseralizeMsg(msg);
         }
         void CheckComponents()
@@ -138,7 +139,8 @@ namespace SEScript
                             SelectTarget();
                             if(!SelectedTarget.IsEmpty())
                             {
-                                FireControl.CustomData += "FireControl|TurretAimAt|" + SelectedTarget.Position.X.ToString() + "_" + SelectedTarget.Position.Y.ToString() + "_" + SelectedTarget.Position.Z.ToString() + "|+";
+                                Vector3D hitPos = (Vector3D)SelectedTarget.HitPosition;
+                                FireControl.CustomData += "FireControl|TurretAimAt|" + hitPos.X.ToString() + "_" + hitPos.Y.ToString() + "_" + hitPos.Z.ToString() + "_" + SelectedTarget.Velocity.X + "_" + SelectedTarget.Velocity.Y + "_" + SelectedTarget.Velocity.Z + "|+";
                                 controlCD = 3;
                             }
                         }
@@ -151,7 +153,7 @@ namespace SEScript
                             SelectTarget();
                             if(!SelectedTarget.IsEmpty())
                             {
-                                FireControl.CustomData += "FireControl|MissileLaunchAt|" + SelectedTarget.Position.X.ToString() + "_" + SelectedTarget.Position.Y.ToString() + "_" + SelectedTarget.Position.Z.ToString() + "|+";
+                                FireControl.CustomData += "FireControl|MissileLaunchAt|" + SelectedTarget.Position.X.ToString() + "_" + SelectedTarget.Position.Y.ToString() + "_" + SelectedTarget.Position.Z.ToString() + "_" + SelectedTarget.Velocity.X + "_" + SelectedTarget.Velocity.Y + "_" + SelectedTarget.Velocity.Z + "|+";
                                 controlCD = 3;
                             }
                         }

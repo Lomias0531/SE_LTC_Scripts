@@ -77,7 +77,6 @@ namespace SEScript
             if(AutoWeapons.Count == 0)
             {
                 Echo("No auto weapon found!");
-                return;
             }
             foreach (IMyProgrammableBlock item in CommandBlocks)
             {

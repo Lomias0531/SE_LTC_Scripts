@@ -74,17 +74,22 @@ namespace SEScript
         }
         void ManualControl()
         {
-            Vector3D MoveDir = MainControl.MoveIndicator;
-            for(int i = 0;i<2;i++)
+            Vector3D playerControl = MainControl.MoveIndicator;
+
+            if (playerControl.Z != 0 || playerControl.Y != 0)
             {
-                Vector3D targetPos = VTOLRot[i].GetPosition() + new Vector3D(0, MoveDir.Y * 30, MoveDir.Z * 30);
-                MatrixD matrix = MatrixD.CreateLookAt(new Vector3D(), VTOLDir[i].WorldMatrix.Forward, VTOLDir[i].WorldMatrix.Up);
-                Vector3D moveDir = Vector3D.TransformNormal(targetPos - VTOLRot[i].GetPosition(), matrix);
-                VTOLRot[i].TargetVelocityRPM = (float)(moveDir.Y * 50f);
-            }
-            foreach (var item in VTOLThrust)
-            {
-                item.ThrustOverridePercentage = 1f;
+                foreach (var thrust in VTOLThrust)
+                {
+                    thrust.ThrustOverridePercentage = 1f;
+                }
+                for (int i = 0; i < 2; i++)
+                {
+                    Vector3D GDir = VTOLDir[i].GetNaturalGravity();
+                    Vector3D tarPos = VTOLDir[i].GetPosition() + new Vector3D(0, GDir.Y * playerControl.Y * -1, GDir.Z * playerControl.Z);
+                    MatrixD matrix = MatrixD.CreateLookAt(new Vector3D(), VTOLDir[i].WorldMatrix.Forward, VTOLDir[i].WorldMatrix.Up);
+                    Vector3D angle = Vector3D.TransformNormal(VTOLDir[i].GetPosition() - tarPos, matrix);
+                    VTOLRot[i].TargetVelocityRPM = (float)angle.Z * 50f * (i == 0 ? -1 : 1);
+                }
             }
         }
     }
