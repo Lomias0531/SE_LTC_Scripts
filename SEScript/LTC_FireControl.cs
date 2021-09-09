@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 using Sandbox.ModAPI.Ingame;
+using VRageMath;
 
 namespace SEScript
 {
@@ -170,13 +171,16 @@ namespace SEScript
                     for (int i = LongRangeScanTargets.Count - 1; i >= 0; i--)
                     {
                         bool foundThis = false;
-                        foreach (var cam in scanners)
+                        for(int s = 0;s<10;s++)
                         {
-                            MyDetectedEntityInfo detect = cam.Raycast(LongRangeScanTargets[i].Position);
-                            if (!detect.IsEmpty())
+                            foreach (var cam in scanners)
                             {
-                                foundThis = true;
-                                break;
+                                MyDetectedEntityInfo detect = cam.Raycast(LongRangeScanTargets[i].Position);
+                                if (!detect.IsEmpty())
+                                {
+                                    foundThis = true;
+                                    break;
+                                }
                             }
                         }
                         if (!foundThis)
@@ -351,11 +355,33 @@ namespace SEScript
                         {
                             item.CustomData = "Turret|KeepTarget|" + curCmd[2];
                         }
+
+                        string[]pos = curCmd[2].Split('_');
+                        List<IMyCameraBlock> scanners = GetAvailableScanner();
+                        float x = float.Parse(pos[0]);
+                        float y = float.Parse(pos[1]);
+                        float z = float.Parse(pos[2]);
+                        for (int s = 0; s < 10; s++)
+                        {
+                            foreach (var cam in scanners)
+                            {
+                                MyDetectedEntityInfo detect = cam.Raycast(new Vector3D(x,y,z));
+                                if (!detect.IsEmpty())
+                                {
+                                    if(!LongRangeScanTargets.Contains(detect))
+                                    {
+                                        LongRangeScanTargets.Add(detect);
+                                    }
+                                    break;
+                                }
+                            }
+                        }
                         break;
                     }
                 case "MissileLaunchAt": //导弹发射
                     {
                         GridTerminalSystem.GetBlocksOfType(CommandBlocks);
+                        MissileLaunchers.Clear();
                         foreach (var item in CommandBlocks)
                         {
                             if (item.CustomName.Contains("LTC_Missile"))
@@ -367,6 +393,27 @@ namespace SEScript
                         {
                             item.CustomData = "Missile|Launch|" + curCmd[2];
                             item.TryRun("Missile|Launch|" + curCmd[2]);
+                        }
+
+                        string[] pos = curCmd[2].Split('_');
+                        List<IMyCameraBlock> scanners = GetAvailableScanner();
+                        float x = float.Parse(pos[0]);
+                        float y = float.Parse(pos[1]);
+                        float z = float.Parse(pos[2]);
+                        for (int s = 0; s < 10; s++)
+                        {
+                            foreach (var cam in scanners)
+                            {
+                                MyDetectedEntityInfo detect = cam.Raycast(new Vector3D(x, y, z));
+                                if (!detect.IsEmpty())
+                                {
+                                    if (!LongRangeScanTargets.Contains(detect))
+                                    {
+                                        LongRangeScanTargets.Add(detect);
+                                    }
+                                    break;
+                                }
+                            }
                         }
                         break;
                     }
