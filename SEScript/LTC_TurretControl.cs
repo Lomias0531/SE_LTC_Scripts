@@ -99,9 +99,9 @@ namespace SEScript
             //此处借鉴于MEA预瞄算法
             Vector3D hitPos;
             double hitTime;
-            hitTime = Vector3D.Distance(Me.GetPosition(), targetPos) / shellSpeed + 0.1f;
+            hitTime = Vector3D.Distance(Me.GetPosition(), targetPos) / shellSpeed;
             hitPos = targetPos + targetVel * hitTime - remote.GetNaturalGravity() * hitTime;
-            for(int i = 0;i<3;i++)
+            for(int i = 0;i<6;i++)
             {
                 hitTime = Vector3D.Distance(Me.GetPosition(), hitPos) / shellSpeed;
                 hitPos = targetPos + targetVel * hitTime - remote.GetNaturalGravity() * hitTime;

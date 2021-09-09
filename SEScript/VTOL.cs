@@ -61,15 +61,16 @@ namespace SEScript
         void AutoBreak()
         {
             if (MainControl.MoveIndicator.Y != 0 || MainControl.MoveIndicator.Z != 0) return;
-            MatrixD matrix = MatrixD.CreateLookAt(new Vector3D(), MainControl.WorldMatrix.Forward, MainControl.WorldMatrix.Up);
-            Vector3D curVelDirToSelf = Vector3D.TransformNormal(MainControl.GetShipVelocities().LinearVelocity * -1, matrix);
+
             for(int i = 0;i<2;i++)
             {
+                MatrixD matrix = MatrixD.CreateLookAt(new Vector3D(), VTOLDir[i].WorldMatrix.Forward, VTOLDir[i].WorldMatrix.Up);
+                Vector3D curVelDirToSelf = Vector3D.TransformNormal(MainControl.GetShipVelocities().LinearVelocity, matrix);
                 VTOLRot[i].TargetVelocityRPM = (float)(curVelDirToSelf.Y * 50f);
             }
             foreach (var item in VTOLThrust)
             {
-                item.ThrustOverridePercentage = (float)MainControl.GetShipSpeed();
+                item.ThrustOverridePercentage = (float)MainControl.GetShipSpeed() * 5f;
             }
         }
         void ManualControl()
