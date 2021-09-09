@@ -305,7 +305,7 @@ namespace SEScript
         }
         void Fire()
         {
-            MyDetectedEntityInfo target = IFF.Raycast(500);
+            MyDetectedEntityInfo target = IFF.Raycast(100);
             if (target.Relationship == VRage.Game.MyRelationsBetweenPlayerAndBlock.Owner)
             {
                 FireControl.CustomData += "FireControl|TurretRequestTarget|" + Me.GetId() + "|+";
