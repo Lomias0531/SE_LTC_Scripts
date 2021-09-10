@@ -87,6 +87,7 @@ namespace SEScript
                 {
                     Vector3D GDir = VTOLDir[i].GetNaturalGravity();
                     Vector3D tarPos = VTOLDir[i].GetPosition() + new Vector3D(0, GDir.Y * playerControl.Y * -1, GDir.Z * playerControl.Z);
+                    tarPos = Vector3D.Reject(tarPos, VTOLDir[i].WorldMatrix.Left);
                     MatrixD matrix = MatrixD.CreateLookAt(new Vector3D(), VTOLDir[i].WorldMatrix.Forward, VTOLDir[i].WorldMatrix.Up);
                     Vector3D angle = Vector3D.TransformNormal(VTOLDir[i].GetPosition() - tarPos, matrix);
                     VTOLRot[i].TargetVelocityRPM = (float)angle.Z * 50f * (i == 0 ? -1 : 1);

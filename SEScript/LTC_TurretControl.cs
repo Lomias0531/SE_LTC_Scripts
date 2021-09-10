@@ -100,11 +100,11 @@ namespace SEScript
             Vector3D hitPos;
             double hitTime;
             hitTime = Vector3D.Distance(Me.GetPosition(), targetPos) / shellSpeed;
-            hitPos = targetPos + targetVel * hitTime - remote.GetNaturalGravity() * hitTime;
+            hitPos = targetPos + (targetVel - remote.GetNaturalGravity() * hitTime / 2 - remote.GetShipVelocities().LinearVelocity) * hitTime;
             for(int i = 0;i<6;i++)
             {
                 hitTime = Vector3D.Distance(Me.GetPosition(), hitPos) / shellSpeed;
-                hitPos = targetPos + targetVel * hitTime - remote.GetNaturalGravity() * hitTime;
+                hitPos = targetPos + (targetVel - remote.GetNaturalGravity() * hitTime / 2 - remote.GetShipVelocities().LinearVelocity) * hitTime;
             }
             return hitPos;
         }
