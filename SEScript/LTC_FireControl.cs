@@ -170,15 +170,21 @@ namespace SEScript
                     for (int i = LongRangeScanTargets.Count - 1; i >= 0; i--)
                     {
                         bool foundThis = false;
-                        for(int s = 0;s<10;s++)
+                        for (int tx = -10; tx <= 10; tx++)
                         {
-                            foreach (var cam in scanners)
+                            for (int ty = -10; ty <= 10; ty++)
                             {
-                                MyDetectedEntityInfo detect = cam.Raycast(LongRangeScanTargets[i].Position);
-                                if (!detect.IsEmpty())
+                                for(int tz = -10;tz <= 10; tz++)
                                 {
-                                    foundThis = true;
-                                    break;
+                                    foreach (var cam in scanners)
+                                    {
+                                        MyDetectedEntityInfo detect = cam.Raycast(LongRangeScanTargets[i].Position + new Vector3D(LongRangeScanTargets[i].BoundingBox.Size.X * tx * 0.1, LongRangeScanTargets[i].BoundingBox.Size.Y * ty * 0.1, LongRangeScanTargets[i].BoundingBox.Size.Z * tz * 0.1));
+                                        if (!detect.IsEmpty())
+                                        {
+                                            foundThis = true;
+                                            break;
+                                        }
+                                    }
                                 }
                             }
                         }
