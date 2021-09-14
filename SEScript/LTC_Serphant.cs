@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 using Sandbox.ModAPI.Ingame;
+using Sandbox.ModAPI.Interfaces;
 using SpaceEngineers.Game.ModAPI;
 using VRageMath;
 
@@ -13,7 +14,7 @@ namespace SEScript
         IMyRemoteControl Remote;
         List<IMyWarhead> WarHeads;
         List<IMyGyro> Gyros;
-        IMyShipMergeBlock Merge;
+        List<IMyShipMergeBlock> Merge;
         List<IMyThrust> Thrusts;
         bool CheckReady = false;
 
@@ -21,6 +22,7 @@ namespace SEScript
         bool launched = false;
         Vector3D TargetPos;
         Vector3D TargetVel;
+        float TimeStamp = 0;
         void Main(string arg)
         {
             if(!CheckReady)
@@ -34,6 +36,14 @@ namespace SEScript
                 ScanTarget();
                 TrackTarget();
             }
+            TimeStamp += 1;
+            if(TimeStamp == 100)
+            {
+                foreach (var item in Merge)
+                {
+                    item.Enabled = true;
+                }
+            }
         }
         void CheckComponents()
         {
@@ -45,6 +55,13 @@ namespace SEScript
                 group.GetBlocksOfType(terminals);
                 if(terminals.Contains(Me as IMyProgrammableBlock))
                 {
+                    Merge = new List<IMyShipMergeBlock>();
+                    group.GetBlocksOfType(Merge);
+                    if (Merge.Count == 0)
+                    {
+                        Echo("Merge");
+                        return;
+                    }
                     Scanners = new List<IMyCameraBlock>();
                     group.GetBlocksOfType(Scanners);
                     if(Scanners.Count == 0)
@@ -74,6 +91,10 @@ namespace SEScript
                         Echo("Gyros");
                         return;
                     }
+                    foreach (var item in Gyros)
+                    {
+                        item.GyroOverride = true;
+                    }
                     Thrusts = new List<IMyThrust>();
                     group.GetBlocksOfType(Thrusts);
                     if(Thrusts.Count == 0)
@@ -81,14 +102,6 @@ namespace SEScript
                         Echo("Thrust");
                         return;
                     }
-                    List<IMyShipMergeBlock> merges = new List<IMyShipMergeBlock>();
-                    group.GetBlocksOfType(merges);
-                    if(merges.Count == 0)
-                    {
-                        Echo("Merge");
-                        return;
-                    }
-                    Merge = merges[0];
                 }
             }
 
@@ -98,13 +111,44 @@ namespace SEScript
         }
         void ScanTarget()
         {
+            //持续追踪目标
+            bool targetAcquired = false;
             foreach (var cam in Scanners)
             {
                 MyDetectedEntityInfo target = cam.Raycast(TargetPos);
                 if (!target.IsEmpty())
                 {
-                    TargetPos = target.BoundingBox.Center;
-                    TargetVel = target.Velocity;
+                    if(target.Relationship == VRage.Game.MyRelationsBetweenPlayerAndBlock.Enemies)
+                    {
+                        Echo("Target locking");
+                        TargetPos = target.BoundingBox.Center;
+                        TargetVel = target.Velocity;
+                        targetAcquired = true;
+                    }
+                }
+            }
+            //若目标丢失则每帧随机取30个采样点进行探测
+            if(!targetAcquired)
+            {
+                foreach (var cam in Scanners)
+                {
+                    for(int i = 0;i<30;i++)
+                    {
+                        Random rnd = new Random();
+                        float offsetX = rnd.Next(-90000, 90000) / 1000;
+                        float offsetY = rnd.Next(-90000, 90000) / 1000;
+                        MyDetectedEntityInfo target = cam.Raycast(4000, offsetX, offsetY);
+                        if (!target.IsEmpty())
+                        {
+                            if (target.Relationship == VRage.Game.MyRelationsBetweenPlayerAndBlock.Enemies)
+                            {
+                                Echo("Target acquired");
+                                TargetPos = target.BoundingBox.Center;
+                                TargetVel = target.Velocity;
+                                targetAcquired = true;
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -117,21 +161,40 @@ namespace SEScript
                     item.Detonate();
                 }
             }
+            float estimatedTime = (float)(Vector3D.Distance(TargetPos, Remote.GetPosition()) / Remote.GetShipSpeed());
+            Vector3D VTD = Vector3D.Reject(TargetVel - Remote.GetShipSpeed(),TargetPos - Remote.GetPosition()) - Remote.GetNaturalGravity() * estimatedTime * 0.5f;
+            TargetPos += VTD * estimatedTime;
+            MatrixD matrix = MatrixD.CreateLookAt(new Vector3D(), Remote.WorldMatrix.Forward, Remote.WorldMatrix.Up);
+            Vector3D posAngle = Vector3D.Normalize(Vector3D.TransformNormal(TargetPos - Remote.GetPosition(), matrix));
+            foreach (var Gyr in Gyros)
+            {
+                Gyr.SetValue("Pitch", (float)posAngle.Y * -60f);
+                Gyr.SetValue("Yaw", (float)posAngle.X * -60f);
+            }
         }
         void Launch()
         {
-            Merge.Enabled = false;
+            foreach (var item in Merge)
+            {
+                item.Enabled = false;
+            } 
             launched = true;
             foreach (var item in WarHeads)
             {
                 item.IsArmed = true;
             }
+            foreach (var item in Thrusts)
+            {
+                item.ThrustOverridePercentage = 1f;
+            }
+            TimeStamp = 0;
         }
         void ExecuteCmd(string msg)
         {
             string cmd = string.IsNullOrEmpty(msg) ? Me.CustomData : msg;
             string[] cmds = cmd.Split('|');
             if (cmds[0] != "Missile") return;
+            if (launched) return;
             switch(cmds[1])
             {
                 case "Launch":

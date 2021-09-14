@@ -235,10 +235,6 @@ namespace SEScript
                         commandQueue.Enqueue(command);
                 }
             }
-            if(commandQueue.Count<=0)
-            {
-                return;
-            }
             AcquireTargets();
             if (AllScanTargets.Count == 0)
             {
@@ -252,207 +248,215 @@ namespace SEScript
                 }
             }
             //处理命令
-            string curCommand = commandQueue.Dequeue();
-            string[] curCmd = curCommand.Split('|');
-            switch(curCmd[1])
+            for(int t = 0;t<5;t++)
             {
-                default:
-                    {
-                        break;
-                    }
-                case "RegisterTurret": //注册炮塔
-                    {
-                        foreach (IMyProgrammableBlock item in CommandBlocks)
+                if (commandQueue.Count <= 0)
+                {
+                    return;
+                }
+                string curCommand = commandQueue.Dequeue();
+                string[] curCmd = curCommand.Split('|');
+                switch (curCmd[1])
+                {
+                    default:
                         {
-                            if(item.GetId() == long.Parse(curCmd[2]))
+                            break;
+                        }
+                    case "RegisterTurret": //注册炮塔
+                        {
+                            foreach (IMyProgrammableBlock item in CommandBlocks)
                             {
-                                Turrets.Add(item);
+                                if (item.GetId() == long.Parse(curCmd[2]))
+                                {
+                                    Turrets.Add(item);
+                                    break;
+                                }
+                            }
+                            break;
+                        }
+                    case "RegisterPointDefense": //注册点防御
+                        {
+                            foreach (IMyProgrammableBlock item in CommandBlocks)
+                            {
+                                if (item.GetId() == long.Parse(curCmd[2]))
+                                {
+                                    PointDefenses.Add(item);
+                                    break;
+                                }
+                            }
+                            break;
+                        }
+                    case "SwitchWeaponMode": //切换开火模式
+                        {
+                            switch (curCmd[2])
+                            {
+                                default:
+                                    {
+                                        curMode = WeaponMode.Auto;
+                                        break;
+                                    }
+                                case "Manual":
+                                    {
+                                        curMode = WeaponMode.Manual;
+                                        break;
+                                    }
+                                case "Halt":
+                                    {
+                                        curMode = WeaponMode.Halt;
+                                        break;
+                                    }
+                            }
+                            break;
+                        }
+                    case "TurretRequestTarget": //炮塔申请目标
+                        {
+                            AcquireTargets();
+                            if (AllScanTargets.Count == 0)
+                            {
+                                foreach (var item in Turrets)
+                                {
+                                    if (item.GetId() == long.Parse(curCmd[2]))
+                                    {
+                                        item.CustomData = "Turret|Idle|";
+                                    }
+                                }
                                 break;
                             }
-                        }
-                        break;
-                    }
-                case "RegisterPointDefense": //注册点防御
-                    {
-                        foreach (IMyProgrammableBlock item in CommandBlocks)
-                        {
-                            if (item.GetId() == long.Parse(curCmd[2]))
-                            {
-                                PointDefenses.Add(item);
-                                break;
-                            }
-                        }
-                        break;
-                    }
-                case "SwitchWeaponMode": //切换开火模式
-                    {
-                        switch(curCmd[2])
-                        {
-                            default:
-                                {
-                                    curMode = WeaponMode.Auto;
-                                    break;
-                                }
-                            case "Manual":
-                                {
-                                    curMode = WeaponMode.Manual;
-                                    break;
-                                }
-                            case "Halt":
-                                {
-                                    curMode = WeaponMode.Halt;
-                                    break;
-                                }
-                        }
-                        break;
-                    }
-                case "TurretRequestTarget": //炮塔申请目标
-                    {
-                        AcquireTargets();
-                        if (AllScanTargets.Count == 0)
-                        {
+                            int index = rnd.Next(0, AllScanTargets.Count - 1);
                             foreach (var item in Turrets)
                             {
                                 if (item.GetId() == long.Parse(curCmd[2]))
                                 {
-                                    item.CustomData = "Turret|Idle|";
+                                    item.CustomData = "Turret|Target|" + AllScanTargets[index].Position.X + "_" + AllScanTargets[index].Position.Y + "_" + AllScanTargets[index].Position.Z + "_" + AllScanTargets[index].Velocity.X + "_" + AllScanTargets[index].Velocity.Y + "_" + AllScanTargets[index].Velocity.Z;
                                 }
                             }
                             break;
                         }
-                        int index = rnd.Next(0, AllScanTargets.Count - 1);
-                        foreach (var item in Turrets)
+                    case "PointDefenseRequestTarget": //点防御申请目标
                         {
-                            if(item.GetId() == long.Parse(curCmd[2]))
+                            AcquireTargets();
+                            if (ShortRangeScanTargets.Count == 0)
                             {
-                                item.CustomData = "Turret|Target|" + AllScanTargets[index].Position.X + "_" + AllScanTargets[index].Position.Y + "_" + AllScanTargets[index].Position.Z + "_" + AllScanTargets[index].Velocity.X + "_" + AllScanTargets[index].Velocity.Y + "_" + AllScanTargets[index].Velocity.Z;
+                                foreach (var item in PointDefenses)
+                                {
+                                    if (item.GetId() == long.Parse(curCmd[2]))
+                                    {
+                                        item.CustomData = "PointDefense|Idle|";
+                                    }
+                                }
+                                break;
                             }
-                        }
-                        break;
-                    }
-                case "PointDefenseRequestTarget": //点防御申请目标
-                    {
-                        AcquireTargets();
-                        if (ShortRangeScanTargets.Count == 0)
-                        {
+                            int index = rnd.Next(0, ShortRangeScanTargets.Count - 1);
                             foreach (var item in PointDefenses)
                             {
                                 if (item.GetId() == long.Parse(curCmd[2]))
                                 {
-                                    item.CustomData = "PointDefense|Idle|";
+                                    item.CustomData = "PointDefense|Target|" + ShortRangeScanTargets[index].Position.X + "_" + ShortRangeScanTargets[index].Position.Y + "_" + ShortRangeScanTargets[index].Position.Z;
                                 }
                             }
                             break;
                         }
-                        int index = rnd.Next(0, ShortRangeScanTargets.Count - 1);
-                        foreach (var item in PointDefenses)
+                    case "TurretAimAt": //炮塔锁定目标
                         {
-                            if (item.GetId() == long.Parse(curCmd[2]))
+                            foreach (var item in Turrets)
                             {
-                                item.CustomData = "PointDefense|Target|" + ShortRangeScanTargets[index].Position.X + "_" + ShortRangeScanTargets[index].Position.Y + "_" + ShortRangeScanTargets[index].Position.Z;
+                                item.CustomData = "Turret|KeepTarget|" + curCmd[2];
                             }
-                        }
-                        break;
-                    }
-                case "TurretAimAt": //炮塔锁定目标
-                    {
-                        foreach(var item in Turrets)
-                        {
-                            item.CustomData = "Turret|KeepTarget|" + curCmd[2];
-                        }
 
-                        string[]pos = curCmd[2].Split('_');
-                        List<IMyCameraBlock> scanners = GetAvailableScanner();
-                        float x = float.Parse(pos[0]);
-                        float y = float.Parse(pos[1]);
-                        float z = float.Parse(pos[2]);
-                        for (int s = 0; s < 10; s++)
-                        {
-                            foreach (var cam in scanners)
+                            string[] pos = curCmd[2].Split('_');
+                            List<IMyCameraBlock> scanners = GetAvailableScanner();
+                            float x = float.Parse(pos[0]);
+                            float y = float.Parse(pos[1]);
+                            float z = float.Parse(pos[2]);
+                            for (int s = 0; s < 10; s++)
                             {
-                                MyDetectedEntityInfo detect = cam.Raycast(new Vector3D(x,y,z));
-                                if (!detect.IsEmpty())
+                                foreach (var cam in scanners)
                                 {
-                                    if(!LongRangeScanTargets.Contains(detect))
+                                    MyDetectedEntityInfo detect = cam.Raycast(new Vector3D(x, y, z));
+                                    if (!detect.IsEmpty())
                                     {
-                                        LongRangeScanTargets.Add(detect);
+                                        if (!LongRangeScanTargets.Contains(detect))
+                                        {
+                                            LongRangeScanTargets.Add(detect);
+                                        }
+                                        break;
                                     }
-                                    break;
                                 }
                             }
+                            break;
                         }
-                        break;
-                    }
-                case "MissileLaunchAt": //导弹发射
-                    {
-                        GridTerminalSystem.GetBlocksOfType(CommandBlocks);
-                        MissileLaunchers.Clear();
-                        foreach (var item in CommandBlocks)
+                    case "MissileLaunchAt": //导弹发射
                         {
-                            if (item.CustomName.Contains("LTC_Missile"))
+                            CommandBlocks.Clear();
+                            GridTerminalSystem.GetBlocksOfType(CommandBlocks);
+                            MissileLaunchers.Clear();
+                            foreach (var item in CommandBlocks)
                             {
-                                MissileLaunchers.Add(item);
+                                if (item.CustomName.Contains("LTC_Missile"))
+                                {
+                                    MissileLaunchers.Add(item);
+                                }
                             }
-                        }
-                        foreach (var item in MissileLaunchers)
-                        {
-                            item.CustomData = "Missile|Launch|" + curCmd[2];
-                            item.TryRun("Missile|Launch|" + curCmd[2]);
-                        }
+                            foreach (var item in MissileLaunchers)
+                            {
+                                item.CustomData = "Missile|Launch|" + curCmd[2];
+                                item.TryRun("Missile|Launch|" + curCmd[2]);
+                            }
 
-                        string[] pos = curCmd[2].Split('_');
-                        List<IMyCameraBlock> scanners = GetAvailableScanner();
-                        float x = float.Parse(pos[0]);
-                        float y = float.Parse(pos[1]);
-                        float z = float.Parse(pos[2]);
-                        for (int s = 0; s < 10; s++)
-                        {
-                            foreach (var cam in scanners)
+                            string[] pos = curCmd[2].Split('_');
+                            List<IMyCameraBlock> scanners = GetAvailableScanner();
+                            float x = float.Parse(pos[0]);
+                            float y = float.Parse(pos[1]);
+                            float z = float.Parse(pos[2]);
+                            for (int s = 0; s < 10; s++)
                             {
-                                MyDetectedEntityInfo detect = cam.Raycast(new Vector3D(x, y, z));
-                                if (!detect.IsEmpty())
+                                foreach (var cam in scanners)
                                 {
-                                    if (!LongRangeScanTargets.Contains(detect))
+                                    MyDetectedEntityInfo detect = cam.Raycast(new Vector3D(x, y, z));
+                                    if (!detect.IsEmpty())
                                     {
-                                        LongRangeScanTargets.Add(detect);
+                                        if (!LongRangeScanTargets.Contains(detect))
+                                        {
+                                            LongRangeScanTargets.Add(detect);
+                                        }
+                                        break;
                                     }
-                                    break;
                                 }
                             }
+                            break;
                         }
-                        break;
-                    }
-                case "IndicatorIdle": //目标指示器未选择目标
-                    {
-                        foreach (var item in Turrets)
+                    case "IndicatorIdle": //目标指示器未选择目标
                         {
-                            item.CustomData = "Turret|Restore";
+                            foreach (var item in Turrets)
+                            {
+                                item.CustomData = "Turret|Restore";
+                            }
+                            break;
                         }
-                        break;
-                    }
-                case "TargetFilter":
-                    {
-                        switch(curCmd[2])
+                    case "TargetFilter":
                         {
-                            case "Enemies":
-                                {
-                                    TargetFilter.Clear();
-                                    TargetFilter.Add(VRage.Game.MyRelationsBetweenPlayerAndBlock.Enemies);
-                                    break;
-                                }
-                            case "All":
-                                {
-                                    TargetFilter.Clear();
-                                    TargetFilter.Add(VRage.Game.MyRelationsBetweenPlayerAndBlock.Enemies);
-                                    TargetFilter.Add(VRage.Game.MyRelationsBetweenPlayerAndBlock.Neutral);
-                                    TargetFilter.Add(VRage.Game.MyRelationsBetweenPlayerAndBlock.NoOwnership);
-                                    break;
-                                }
+                            switch (curCmd[2])
+                            {
+                                case "Enemies":
+                                    {
+                                        TargetFilter.Clear();
+                                        TargetFilter.Add(VRage.Game.MyRelationsBetweenPlayerAndBlock.Enemies);
+                                        break;
+                                    }
+                                case "All":
+                                    {
+                                        TargetFilter.Clear();
+                                        TargetFilter.Add(VRage.Game.MyRelationsBetweenPlayerAndBlock.Enemies);
+                                        TargetFilter.Add(VRage.Game.MyRelationsBetweenPlayerAndBlock.Neutral);
+                                        TargetFilter.Add(VRage.Game.MyRelationsBetweenPlayerAndBlock.NoOwnership);
+                                        break;
+                                    }
+                            }
+                            break;
                         }
-                        break;
-                    }
-            }
-            Me.CustomData = "";
+                }
+                Me.CustomData = "";
+            }            
         }
     }
 }
