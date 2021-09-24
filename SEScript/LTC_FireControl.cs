@@ -103,8 +103,10 @@ namespace SEScript
             CheckReady = true;
             return;
         }
+        //摄像头扫描不能逐帧进行，这里需要注意
         void AcquireTargets()
         {
+            ScanCount = ScanCD;
             ShortRangeScanTargets.Clear();
             foreach (IMyLargeTurretBase tut in AutoWeapons)
             {
@@ -112,12 +114,16 @@ namespace SEScript
                 if(TargetFilter.Contains(target.Relationship))
                     ShortRangeScanTargets.Add(target);
             }
-            if(AllScanTargets.Count > 0)
+            if (ScanCount == 0)
             {
-                LongRangeDetailedScan();
-            }else
-            {
-                LongRangeSimpleScan();
+                if (AllScanTargets.Count > 0)
+                {
+                    LongRangeDetailedScan();
+                }
+                else
+                {
+                    LongRangeSimpleScan();
+                }
             }
             AllScanTargets.Clear();
             foreach (var item in ShortRangeScanTargets)
@@ -132,20 +138,15 @@ namespace SEScript
         //长程简单扫描，由于消耗较多电力，因此设定有扫描期限
         void LongRangeSimpleScan()
         {
-            if (ScanCount > 0)
-            {
-                return;
-            }
             LongRangeScanTargets.Clear();
-            ScanCount = ScanCD;
             
             foreach (var cam in GetAvailableScanner())
             {
                 cam.EnableRaycast = true;
                 for(int i = 0;i<8000;i++)
                 {
-                    float X = (float)(rnd.Next(-90000, 90000) / 1000f);
-                    float Y = (float)(rnd.Next(-90000, 90000) / 1000f);
+                    float X = (float)(rnd.Next(-45000, 45000) / 1000f);
+                    float Y = (float)(rnd.Next(-45000, 45000) / 1000f);
                     MyDetectedEntityInfo tar = cam.Raycast(4000, X, Y);
                     if (!tar.IsEmpty())
                     {
@@ -199,9 +200,9 @@ namespace SEScript
             foreach (var cam in scanners)
             {
                 cam.EnableRaycast = true;
-                for(float offsetx = -90; offsetx < 90; offsetx += 3)
+                for(float offsetx = -45; offsetx < 45; offsetx += 3)
                 {
-                    for(float offsety = -90; offsety<90;offsety +=3)
+                    for(float offsety = -45; offsety<45;offsety +=3)
                     {
                         MyDetectedEntityInfo tar = cam.Raycast(4000, offsetx + ScanOffsetX * 0.15f, offsety + ScanOffsetY * 0.15f);
                         if(!tar.IsEmpty())

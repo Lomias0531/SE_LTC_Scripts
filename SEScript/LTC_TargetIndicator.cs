@@ -99,7 +99,7 @@ namespace SEScript
                 if (controller.MoveIndicator.Y < 0)
                 {
                     SelectTarget();
-                    controlCD = 3;
+                    controlCD = 10;
                 }
             }
         }
