@@ -18,7 +18,7 @@ namespace SEScript
         List<IMyThrust> Thrusts;
         bool CheckReady = false;
 
-        float MissileMass = 0;
+        float MissileMass = 1869;
         bool launched = false;
         Vector3D TargetPos;
         Vector3D TargetVel;
@@ -39,16 +39,17 @@ namespace SEScript
                 ScanTarget();
                 TrackTarget();
             }
-            if(TimeStamp == 100)
-            {
-                foreach (var item in Merge)
-                {
-                    item.Enabled = true;
-                }
-            }
+            //if(TimeStamp == 100)
+            //{
+            //    foreach (var item in Merge)
+            //    {
+            //        item.Enabled = true;
+            //    }
+            //}
         }
         void CheckComponents()
         {
+            Runtime.UpdateFrequency = UpdateFrequency.Update1;
             List<IMyBlockGroup> groups = new List<IMyBlockGroup>();
             GridTerminalSystem.GetBlockGroups(groups);
             foreach (var group in groups)
@@ -116,7 +117,6 @@ namespace SEScript
             }
 
             CheckReady = true;
-            Runtime.UpdateFrequency = UpdateFrequency.Update1;
             return;
         }
         void ScanTarget()
@@ -177,7 +177,7 @@ namespace SEScript
                     item.Detonate();
                 }
             }
-            Echo(TargetPos.ToString());
+            Echo(TargetPos.ToString("F2"));
 
             if(TimeStamp < 200)
             {
@@ -203,12 +203,12 @@ namespace SEScript
             }
             double missileAcc = maxThrust / MissileMass;
             //排除不需要的速度
-            Vector3D tarN = Vector3D.Normalize(TargetPos - Remote.GetPosition()); //当前导弹位置指向目标位置的单位指向
-            Vector3D rv = Vector3D.Reject(TargetVel - Remote.GetShipSpeed(), tarN); //相对速度向量排除指向
+            Vector3D tarN = Vector3D.Normalize(TargetPos - Remote.GetPosition()); //当前导弹位置指向目标位置的单位指向, target normalized
+            Vector3D rv = Vector3D.Reject(TargetVel - Remote.GetShipSpeed(), tarN); //相对速度向量排除指向, relative velocity
             //Vector3D ra = Vector3D.Reject(TargetVel, tarN); //相对加速度，可不考虑
-            Vector3D ra = Vector3D.Zero;
+            Vector3D ra = Vector3D.Zero; //relative accleration
             //计算不需要的速度
-            Vector3D rvN = Vector3D.Normalize(rv); //排除后的相对速度单位指向
+            Vector3D rvN = Vector3D.Normalize(rv); //排除后的相对速度单位指向, relative velocity normalized
             double newlen = Math.Atan2(rv.Length(), 5); //相对速度的大小，通过Atan2限定
             Vector3D newrv = rvN * newlen;
             double GuideRate = 0.3;
@@ -230,6 +230,27 @@ namespace SEScript
             Vector3D nam = Vector3D.Normalize(sd);
             var missileLookAt = MatrixD.CreateLookAt(new Vector3D(), Remote.WorldMatrix.Up, Remote.WorldMatrix.Backward);
             var amToMe = Vector3D.TransformNormal(nam, missileLookAt);
+            Echo(nam.ToString("F2"));
+            Echo(amToMe.ToString("F2"));
+
+            ////排除不需要的速度
+            //Vector3D tarN = Vector3D.Normalize(TargetPos - Remote.GetPosition()); //当前导弹位置指向目标位置的单位指向, target normalized
+            //Vector3D rv = Vector3D.Reject(TargetVel - Remote.GetShipSpeed(), tarN); //相对速度向量排除指向, relative velocity
+            ////计算不需要的速度
+            //Vector3D rvN = Vector3D.Normalize(rv); //排除后的相对速度单位指向, relative velocity normalized
+            //Vector3D pd = Vector3D.Normalize(tarN);
+            //Vector3D sd = pd + rvN - Remote.GetNaturalGravity();
+            //Vector3D nam = Vector3D.Normalize(sd);
+            //var missileLookAt = MatrixD.CreateLookAt(new Vector3D(), Remote.WorldMatrix.Up, Remote.WorldMatrix.Backward);
+            //var amToMe = Vector3D.TransformNormal(nam, missileLookAt);
+            //Echo(nam.ToString("F2"));
+            //Echo(amToMe.ToString("F2"));
+
+            foreach (var Gyr in Gyros)
+            {
+                Gyr.SetValue("Pitch", (float)amToMe.Y * -60f);
+                Gyr.SetValue("Yaw", (float)amToMe.X * -60f);
+            }
         }
         void Launch()
         {
@@ -244,7 +265,7 @@ namespace SEScript
             }
             foreach (var item in Thrusts)
             {
-                item.ThrustOverridePercentage = 1f;
+                item.ThrustOverridePercentage = 0.1f;
             }
             TimeStamp = 0;
         }

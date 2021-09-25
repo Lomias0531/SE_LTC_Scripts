@@ -106,7 +106,6 @@ namespace SEScript
         //摄像头扫描不能逐帧进行，这里需要注意
         void AcquireTargets()
         {
-            ScanCount = ScanCD;
             ShortRangeScanTargets.Clear();
             foreach (IMyLargeTurretBase tut in AutoWeapons)
             {
@@ -124,6 +123,7 @@ namespace SEScript
                 {
                     LongRangeSimpleScan();
                 }
+                ScanCount = ScanCD;
             }
             AllScanTargets.Clear();
             foreach (var item in ShortRangeScanTargets)
@@ -143,7 +143,7 @@ namespace SEScript
             foreach (var cam in GetAvailableScanner())
             {
                 cam.EnableRaycast = true;
-                for(int i = 0;i<8000;i++)
+                for(int i = 0;i<10;i++)
                 {
                     float X = (float)(rnd.Next(-45000, 45000) / 1000f);
                     float Y = (float)(rnd.Next(-45000, 45000) / 1000f);
