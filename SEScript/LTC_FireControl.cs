@@ -456,7 +456,8 @@ namespace SEScript
                             break;
                         }
                 }
-                Me.CustomData = "";
+                if(string.IsNullOrEmpty(msg))
+                    Me.CustomData = "";
             }            
         }
     }

@@ -219,7 +219,8 @@ namespace SEScript
                         break;
                     }
             }
-            Me.CustomData = "";
+            if(string.IsNullOrEmpty(cmd))
+                Me.CustomData = "";
         }
     }
 }

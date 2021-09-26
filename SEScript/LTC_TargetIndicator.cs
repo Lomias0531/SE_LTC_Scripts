@@ -5,6 +5,7 @@ using VRage.ModAPI;
 using VRageMath;
 using Sandbox.ModAPI.Ingame;
 using Sandbox.ModAPI.Interfaces;
+using SpaceEngineers.Game.ModAPI;
 
 namespace SEScript
 {
@@ -16,8 +17,13 @@ namespace SEScript
         IMyMotorStator HoriRot;
         IMyRemoteControl controller;
         int controlCD = 0;
+        int controlERE = 100;
         IMyProgrammableBlock FireControl;
         MyDetectedEntityInfo SelectedTarget;
+        bool Locked = false;
+        List<IMyGyro> gyros;
+        List<IMySoundBlock> sound;
+        Vector3D TargetPos;
         void Main(string msg)
         {
             if (!Checked)
@@ -25,8 +31,16 @@ namespace SEScript
                 CheckComponents();
                 return;
             }
-            ControlCam();
+            controlCD = controlCD < 1 ? 0 : controlCD -= 1;
+            if (Locked)
+            {
+                TrackTarget();
+            }else
+            {
+                ControlCam();
+            }
             Echo("Running");
+            Echo("Target acquired: " + Locked);
             DeseralizeMsg(msg);
         }
         void CheckComponents()
@@ -63,6 +77,21 @@ namespace SEScript
                     }
                     controller = remotes[0];
 
+                    gyros = new List<IMyGyro>();
+                    group.GetBlocksOfType(gyros);
+                    if(gyros.Count == 0)
+                    {
+                        Echo("Gyros Error");
+                        return;
+                    }
+
+                    sound = new List<IMySoundBlock>();
+                    group.GetBlocksOfType(sound);
+                    if(sound.Count == 0)
+                    {
+                        Echo("No sound");
+                    }
+
                     foreach (var item in terminals)
                     {
                         if (item.CustomName == "VertRot")
@@ -93,15 +122,73 @@ namespace SEScript
             HoriRot.TargetVelocityRPM = controller.RotationIndicator.X * -1;
             VertRot.TargetVelocityRPM = controller.RotationIndicator.Y;
 
-            controlCD = controlCD < 1 ? 0 : controlCD -= 1;
             if(controlCD == 0)
             {
                 if (controller.MoveIndicator.Y < 0)
                 {
                     SelectTarget();
-                    controlCD = 10;
+                    controlCD = controlERE;
                 }
             }
+        }
+        void TrackTarget()
+        {
+            if (controlCD == 0)
+            {
+                controlCD = controlERE;
+                SelectedTarget = thisCam.Raycast(4000);
+                if(!SelectedTarget.IsEmpty())
+                {
+                    TargetPos = SelectedTarget.BoundingBox.Center;                    
+                }
+                else
+                {
+                    ResumeIdle();
+                    return;
+                }
+            }
+            MatrixD matrix = MatrixD.CreateLookAt(new Vector3D(), controller.WorldMatrix.Forward, controller.WorldMatrix.Up);
+            Vector3D posAngle = Vector3D.Normalize(Vector3D.TransformNormal(TargetPos - controller.GetPosition(), matrix));
+            Echo(TargetPos.ToString("F2"));
+            Echo(posAngle.ToString("F2"));
+
+            HoriRot.TargetVelocityRPM = (float)posAngle.Y * 50;
+            VertRot.TargetVelocityRPM = (float)posAngle.X * 50;
+        }
+        void LockTarget()
+        {
+            if(sound.Count > 0)
+            {
+                foreach (var item in sound)
+                {
+                    item.SelectedSound = "发现敌人";
+                    item.Play();
+                }
+            }
+            TargetPos = SelectedTarget.BoundingBox.Center;
+            Locked = true;
+            foreach (var gyro in gyros)
+            {
+                gyro.GyroOverride = true;
+            }
+        }
+        void ResumeIdle()
+        {
+            if (sound.Count > 0)
+            {
+                foreach (var item in sound)
+                {
+                    item.SelectedSound = "目标完成";
+                    item.Play();
+                }
+            }
+            Locked = false;
+            foreach (var gyro in gyros)
+            {
+                gyro.GyroOverride = false;
+            }
+            Echo("No target");
+            FireControl.CustomData += "FireControl|IndicatorIdle|+";
         }
         void SelectTarget()
         {
@@ -115,14 +202,7 @@ namespace SEScript
         }
         void DeseralizeMsg(string msg)
         {
-            string msg1 = "";
-            if(string.IsNullOrEmpty(msg))
-            {
-                msg1 = Me.CustomData;
-            }else
-            {
-                msg1 = msg; 
-            }
+            string msg1 = string.IsNullOrEmpty(msg) ? Me.CustomData : msg;
             controlCD = controlCD < 1 ? 0 : controlCD -= 1;
             string[] message = msg1.Split('|');
             if (message[0] != "Indicator") return;
@@ -141,7 +221,8 @@ namespace SEScript
                             {
                                 Vector3D hitPos = (Vector3D)SelectedTarget.HitPosition;
                                 FireControl.CustomData += "FireControl|TurretAimAt|" + hitPos.X.ToString() + "_" + hitPos.Y.ToString() + "_" + hitPos.Z.ToString() + "_" + SelectedTarget.Velocity.X + "_" + SelectedTarget.Velocity.Y + "_" + SelectedTarget.Velocity.Z + "|+";
-                                controlCD = 3;
+                                controlCD = controlERE;
+                                LockTarget();
                             }
                         }
                         break;
@@ -154,9 +235,15 @@ namespace SEScript
                             if(!SelectedTarget.IsEmpty())
                             {
                                 FireControl.CustomData += "FireControl|MissileLaunchAt|" + SelectedTarget.Position.X.ToString() + "_" + SelectedTarget.Position.Y.ToString() + "_" + SelectedTarget.Position.Z.ToString() + "_" + SelectedTarget.Velocity.X + "_" + SelectedTarget.Velocity.Y + "_" + SelectedTarget.Velocity.Z + "|+";
-                                controlCD = 3;
+                                controlCD = controlERE;
+                                LockTarget();
                             }
                         }
+                        break;
+                    }
+                case "ResumeManual":
+                    {
+                        ResumeIdle();
                         break;
                     }
             }
