@@ -30,4 +30,10 @@
  *      自动制造导弹部件 ON/OFF
  * 人格选项
  * 重启
+ * 
+ * 2021/9/27
+ * LTC_Indicator
+ * 目标跟踪位置偏移
+ * LTC_TurretControl
+ * 炮口角度修正
  */

@@ -12,12 +12,10 @@ namespace SEScript
     class LTC_TargetIndicator : API
     {
         bool Checked = false;
-        IMyCameraBlock thisCam;
+        List<IMyCameraBlock> camArray;
         IMyMotorStator VertRot;
         IMyMotorStator HoriRot;
         IMyRemoteControl controller;
-        int controlCD = 0;
-        int controlERE = 100;
         IMyProgrammableBlock FireControl;
         MyDetectedEntityInfo SelectedTarget;
         bool Locked = false;
@@ -31,7 +29,6 @@ namespace SEScript
                 CheckComponents();
                 return;
             }
-            controlCD = controlCD < 1 ? 0 : controlCD -= 1;
             if (Locked)
             {
                 TrackTarget();
@@ -41,6 +38,13 @@ namespace SEScript
             }
             Echo("Running");
             Echo("Target acquired: " + Locked);
+            if(Locked)
+            {
+                foreach (var item in camArray)
+                {
+                    Echo("Cam" + item.TimeUntilScan(Vector3D.Distance(TargetPos, item.GetPosition()) + 100));
+                }
+            }
             DeseralizeMsg(msg);
         }
         void CheckComponents()
@@ -56,20 +60,20 @@ namespace SEScript
                 group.GetBlocks(terminals);
                 if (terminals.Contains(Me as IMyTerminalBlock))
                 {
-                    List<IMyCameraBlock> cams = new List<IMyCameraBlock>();
-                    group.GetBlocksOfType(cams);
-                    Echo("Cam " + cams.Count.ToString());
-                    if (cams.Count == 0)
+                    camArray = new List<IMyCameraBlock>();
+                    group.GetBlocksOfType(camArray);
+                    if (camArray.Count == 0)
                     {
                         Echo("Camera Error");
                         return;
                     }
-                    thisCam = cams[0];
-                    thisCam.EnableRaycast = true;
+                    foreach (var item in camArray)
+                    {
+                        item.EnableRaycast = true;
+                    }
 
                     List<IMyRemoteControl> remotes = new List<IMyRemoteControl>();
                     group.GetBlocksOfType(remotes);
-                    Echo("Controller " + remotes.Count.ToString());
                     if (remotes.Count == 0)
                     {
                         Echo("Controller Error");
@@ -122,30 +126,22 @@ namespace SEScript
             HoriRot.TargetVelocityRPM = controller.RotationIndicator.X * -1;
             VertRot.TargetVelocityRPM = controller.RotationIndicator.Y;
 
-            if(controlCD == 0)
+            if (controller.MoveIndicator.Y < 0)
             {
-                if (controller.MoveIndicator.Y < 0)
-                {
-                    SelectTarget();
-                    controlCD = controlERE;
-                }
+                SelectTarget();
             }
         }
         void TrackTarget()
         {
-            if (controlCD == 0)
+            SelectedTarget = GetTarget(TargetPos);
+            if (!SelectedTarget.IsEmpty())
             {
-                controlCD = controlERE;
-                SelectedTarget = thisCam.Raycast(4000);
-                if(!SelectedTarget.IsEmpty())
-                {
-                    TargetPos = SelectedTarget.BoundingBox.Center;                    
-                }
-                else
-                {
-                    ResumeIdle();
-                    return;
-                }
+                TargetPos = SelectedTarget.BoundingBox.Center;
+            }
+            else
+            {
+                ResumeIdle();
+                return;
             }
             MatrixD matrix = MatrixD.CreateLookAt(new Vector3D(), controller.WorldMatrix.Forward, controller.WorldMatrix.Up);
             Vector3D posAngle = Vector3D.Normalize(Vector3D.TransformNormal(TargetPos - controller.GetPosition(), matrix));
@@ -174,6 +170,7 @@ namespace SEScript
         }
         void ResumeIdle()
         {
+            Echo("EEEE");
             if (sound.Count > 0)
             {
                 foreach (var item in sound)
@@ -192,7 +189,7 @@ namespace SEScript
         }
         void SelectTarget()
         {
-            SelectedTarget = thisCam.Raycast(4000);
+            SelectedTarget = GetTarget(4000);
             if (SelectedTarget.IsEmpty())
             {
                 Echo("No target");
@@ -200,10 +197,35 @@ namespace SEScript
                 return;
             }
         }
+        MyDetectedEntityInfo GetTarget(int Range)
+        {
+            MyDetectedEntityInfo target = new MyDetectedEntityInfo();
+            foreach (var camera in camArray)
+            {
+                if(camera.TimeUntilScan(Range) == 0)
+                {
+                    target = camera.Raycast(Range);
+                    return target;
+                }
+            }
+            return target;
+        }
+        MyDetectedEntityInfo GetTarget(Vector3D targetPos)
+        {
+            MyDetectedEntityInfo target = new MyDetectedEntityInfo();
+            foreach (var camera in camArray)
+            {
+                if (camera.TimeUntilScan(Vector3D.Distance(targetPos,camera.GetPosition()) + 100) == 0)
+                {
+                    target = camera.Raycast(targetPos);
+                    return target;
+                }
+            }
+            return target;
+        }
         void DeseralizeMsg(string msg)
         {
             string msg1 = string.IsNullOrEmpty(msg) ? Me.CustomData : msg;
-            controlCD = controlCD < 1 ? 0 : controlCD -= 1;
             string[] message = msg1.Split('|');
             if (message[0] != "Indicator") return;
             switch(message[1])
@@ -214,30 +236,22 @@ namespace SEScript
                     }
                 case "TargetTurret":
                     {
-                        if(controlCD == 0)
+                        SelectTarget();
+                        if (!SelectedTarget.IsEmpty())
                         {
-                            SelectTarget();
-                            if(!SelectedTarget.IsEmpty())
-                            {
-                                Vector3D hitPos = (Vector3D)SelectedTarget.HitPosition;
-                                FireControl.CustomData += "FireControl|TurretAimAt|" + hitPos.X.ToString() + "_" + hitPos.Y.ToString() + "_" + hitPos.Z.ToString() + "_" + SelectedTarget.Velocity.X + "_" + SelectedTarget.Velocity.Y + "_" + SelectedTarget.Velocity.Z + "|+";
-                                controlCD = controlERE;
-                                LockTarget();
-                            }
+                            Vector3D hitPos = (Vector3D)SelectedTarget.HitPosition;
+                            FireControl.CustomData += "FireControl|TurretAimAt|" + hitPos.X.ToString() + "_" + hitPos.Y.ToString() + "_" + hitPos.Z.ToString() + "_" + SelectedTarget.Velocity.X + "_" + SelectedTarget.Velocity.Y + "_" + SelectedTarget.Velocity.Z + "|+";
+                            LockTarget();
                         }
                         break;
                     }
                 case "TargetMissile":
                     {
-                        if (controlCD == 0)
+                        SelectTarget();
+                        if (!SelectedTarget.IsEmpty())
                         {
-                            SelectTarget();
-                            if(!SelectedTarget.IsEmpty())
-                            {
-                                FireControl.CustomData += "FireControl|MissileLaunchAt|" + SelectedTarget.Position.X.ToString() + "_" + SelectedTarget.Position.Y.ToString() + "_" + SelectedTarget.Position.Z.ToString() + "_" + SelectedTarget.Velocity.X + "_" + SelectedTarget.Velocity.Y + "_" + SelectedTarget.Velocity.Z + "|+";
-                                controlCD = controlERE;
-                                LockTarget();
-                            }
+                            FireControl.CustomData += "FireControl|MissileLaunchAt|" + SelectedTarget.Position.X.ToString() + "_" + SelectedTarget.Position.Y.ToString() + "_" + SelectedTarget.Position.Z.ToString() + "_" + SelectedTarget.Velocity.X + "_" + SelectedTarget.Velocity.Y + "_" + SelectedTarget.Velocity.Z + "|+";
+                            LockTarget();
                         }
                         break;
                     }

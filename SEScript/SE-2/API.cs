@@ -8,7 +8,7 @@ namespace Sandbox.ModAPI.Ingame
     {
         public static IMyGridTerminalSystem GridTerminalSystem;
         public static IMyGridProgramRuntimeInfo Runtime;
-        public static IMyIntergridCommunicationSystem IntergridCommunicationSystem;
+        public static IMyIntergridCommunicationSystem IGC;
         public static IMyGridProgram GridProgram;
         public static IMyTerminalBlock Me;
         public static void Echo(string msg)

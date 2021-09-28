@@ -34,6 +34,7 @@ namespace SEScript
         Vector3D targetVel;
         float shellSpeed = 265.17f;
         TurretStatus curStatus = TurretStatus.Idle;
+        //Vector3D aimOffset = new Vector3D(0, 0, 0); //炮口方向修正
         enum TurretStatus
         {
             Aiming,

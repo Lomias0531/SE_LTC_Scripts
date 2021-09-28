@@ -23,8 +23,6 @@ namespace SEScript
         Vector3D TargetPos;
         Vector3D TargetVel;
         float TimeStamp = 0;
-        int ScanCD = 10;
-        int ScanCount = 0;
         void Main(string arg)
         {
             TimeStamp += 1;
@@ -39,13 +37,6 @@ namespace SEScript
                 ScanTarget();
                 TrackTarget();
             }
-            //if(TimeStamp == 100)
-            //{
-            //    foreach (var item in Merge)
-            //    {
-            //        item.Enabled = true;
-            //    }
-            //}
         }
         void CheckComponents()
         {
@@ -121,16 +112,14 @@ namespace SEScript
         }
         void ScanTarget()
         {
-            ScanCount = ScanCount > 0 ? ScanCount -= 1 : 0;
-            if(ScanCount>0)
-            {
-                return;
-            }
-            ScanCount = ScanCD;
             //持续追踪目标
             bool targetAcquired = false;
             foreach (var cam in Scanners)
             {
+                if(cam.TimeUntilScan(Vector3D.Distance(TargetPos,cam.GetPosition()) + 100)>0)
+                {
+                    continue;
+                }
                 MyDetectedEntityInfo target = cam.Raycast(TargetPos);
                 if (!target.IsEmpty())
                 {
@@ -142,27 +131,29 @@ namespace SEScript
                         targetAcquired = true;
                     }
                 }
+                break;
             }
-            //若目标丢失则每帧随机取30个采样点进行探测
+            //若目标丢失则随机取1个采样点进行探测
             if(!targetAcquired)
             {
                 foreach (var cam in Scanners)
                 {
-                    for(int i = 0;i<30;i++)
+                    if(cam.TimeUntilScan(4000)>0)
                     {
-                        Random rnd = new Random();
-                        float offsetX = rnd.Next(-45000, 45000) / 1000;
-                        float offsetY = rnd.Next(-45000, 45000) / 1000;
-                        MyDetectedEntityInfo target = cam.Raycast(4000, offsetX, offsetY);
-                        if (!target.IsEmpty())
+                        continue;
+                    }
+                    Random rnd = new Random();
+                    float offsetX = rnd.Next(-45000, 45000) / 1000;
+                    float offsetY = rnd.Next(-45000, 45000) / 1000;
+                    MyDetectedEntityInfo target = cam.Raycast(4000, offsetX, offsetY);
+                    if (!target.IsEmpty())
+                    {
+                        if (target.Relationship == VRage.Game.MyRelationsBetweenPlayerAndBlock.Enemies)
                         {
-                            if (target.Relationship == VRage.Game.MyRelationsBetweenPlayerAndBlock.Enemies)
-                            {
-                                Echo("Target acquired");
-                                TargetPos = target.BoundingBox.Center;
-                                TargetVel = target.Velocity;
-                                targetAcquired = true;
-                            }
+                            Echo("Target acquired");
+                            TargetPos = target.BoundingBox.Center;
+                            TargetVel = target.Velocity;
+                            targetAcquired = true;
                         }
                     }
                 }

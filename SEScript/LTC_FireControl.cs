@@ -22,8 +22,6 @@ namespace SEScript
         WeaponMode curMode = WeaponMode.Auto;
         bool CheckReady = false;
         Random rnd;
-        int ScanCD = 100;
-        int ScanCount = 0;
         int ScanOffsetX;
         int ScanOffsetY;
         enum WeaponMode
@@ -43,8 +41,6 @@ namespace SEScript
             Echo("Targets: " + AllScanTargets.Count);
             Echo("Turrets: " + Turrets.Count);
             Echo("PointDefenses: " + PointDefenses.Count);
-            Echo("Scan: " + ScanCount);
-            ScanCount = ScanCount > 0 ? ScanCount -= 1 : 0;
             Echo("Cams: " + GetAvailableScanner().Count);
             switch(curMode)
             {
@@ -113,17 +109,13 @@ namespace SEScript
                 if(TargetFilter.Contains(target.Relationship))
                     ShortRangeScanTargets.Add(target);
             }
-            if (ScanCount == 0)
+            if (AllScanTargets.Count > 0)
             {
-                if (AllScanTargets.Count > 0)
-                {
-                    LongRangeDetailedScan();
-                }
-                else
-                {
-                    LongRangeSimpleScan();
-                }
-                ScanCount = ScanCD;
+                LongRangeDetailedScan();
+            }
+            else
+            {
+                LongRangeSimpleScan();
             }
             AllScanTargets.Clear();
             foreach (var item in ShortRangeScanTargets)
