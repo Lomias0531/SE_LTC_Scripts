@@ -18,14 +18,15 @@ namespace SEScript
         List<IMyThrust> Thrusts;
         bool CheckReady = false;
 
-        float MissileMass = 1869;
+        //float MissileMass = 1869;
         bool launched = false;
         Vector3D TargetPos;
         Vector3D TargetVel;
         float TimeStamp = 0;
+        int BreakThroughCount = 0;
+        Vector3D BreakThroughOffset;
         void Main(string arg)
         {
-            TimeStamp += 1;
             if (!CheckReady)
             {
                 CheckComponents();
@@ -34,13 +35,19 @@ namespace SEScript
             ExecuteCmd(arg);
             if(launched)
             {
+                Echo("TARGET LOCKED");
+                TimeStamp += 1;
                 ScanTarget();
                 TrackTarget();
+            }else
+            {
+                Echo("STAND BY");
             }
         }
         void CheckComponents()
         {
             Runtime.UpdateFrequency = UpdateFrequency.Update1;
+            if (string.IsNullOrEmpty(Me.CustomData)) return;
             List<IMyBlockGroup> groups = new List<IMyBlockGroup>();
             GridTerminalSystem.GetBlockGroups(groups);
             foreach (var group in groups)
@@ -56,14 +63,8 @@ namespace SEScript
                         Echo("Merge");
                         return;
                     }
-                    if(TimeStamp < 5)
-                    {
-                        foreach (var item in Merge)
-                        {
-                            item.Enabled = false;
-                        }
-                        return;
-                    }
+
+                    if (TimeStamp <= 10) return;
                     Scanners = new List<IMyCameraBlock>();
                     group.GetBlocksOfType(Scanners);
                     if(Scanners.Count == 0)
@@ -116,7 +117,7 @@ namespace SEScript
             bool targetAcquired = false;
             foreach (var cam in Scanners)
             {
-                if(cam.TimeUntilScan(Vector3D.Distance(TargetPos,cam.GetPosition()) + 100)>0)
+                if(!cam.CanScan(TargetPos))
                 {
                     continue;
                 }
@@ -138,14 +139,14 @@ namespace SEScript
             {
                 foreach (var cam in Scanners)
                 {
-                    if(cam.TimeUntilScan(4000)>0)
+                    if(!cam.CanScan(2000))
                     {
                         continue;
                     }
                     Random rnd = new Random();
                     float offsetX = rnd.Next(-45000, 45000) / 1000;
                     float offsetY = rnd.Next(-45000, 45000) / 1000;
-                    MyDetectedEntityInfo target = cam.Raycast(4000, offsetX, offsetY);
+                    MyDetectedEntityInfo target = cam.Raycast(2000, offsetX, offsetY);
                     if (!target.IsEmpty())
                     {
                         if (target.Relationship == VRage.Game.MyRelationsBetweenPlayerAndBlock.Enemies)
@@ -168,79 +169,37 @@ namespace SEScript
                     item.Detonate();
                 }
             }
-            Echo(TargetPos.ToString("F2"));
 
             if(TimeStamp < 200)
             {
                 return;
             }
 
-            //float estimatedTime = (float)(Vector3D.Distance(TargetPos, Remote.GetPosition()) / Remote.GetShipSpeed());
-            //Vector3D VTD = Vector3D.Reject(TargetVel - Remote.GetShipSpeed(), Vector3D.Normalize(TargetPos - Remote.GetPosition())) - Remote.GetNaturalGravity() * estimatedTime * 0.5f;
-            //TargetPos += VTD * estimatedTime;
-            //MatrixD matrix = MatrixD.CreateLookAt(new Vector3D(), Remote.WorldMatrix.Forward, Remote.WorldMatrix.Up);
-            //Vector3D posAngle = Vector3D.Normalize(Vector3D.TransformNormal(TargetPos - Remote.GetPosition(), matrix));
-            //foreach (var Gyr in Gyros)
-            //{
-            //    Gyr.SetValue("Pitch", (float)posAngle.Y * -60f);
-            //    Gyr.SetValue("Yaw", (float)posAngle.X * -60f);
-            //}
+            MatrixD matrix = MatrixD.CreateLookAt(new Vector3D(), Remote.WorldMatrix.Forward, Remote.WorldMatrix.Up);
+            Vector3D posAngle = Vector3D.Normalize(Vector3D.TransformNormal(Remote.GetPosition() - TargetPos, matrix));
 
-            //计算导弹可提供的最大加速度
-            float maxThrust = 0;
-            foreach (var thr in Thrusts)
+            if((TargetPos - Remote.GetPosition()).Length()<=800)
             {
-                maxThrust += thr.MaxEffectiveThrust;
-            }
-            double missileAcc = maxThrust / MissileMass;
-            //排除不需要的速度
-            Vector3D tarN = Vector3D.Normalize(TargetPos - Remote.GetPosition()); //当前导弹位置指向目标位置的单位指向, target normalized
-            Vector3D rv = Vector3D.Reject(TargetVel - Remote.GetShipSpeed(), tarN); //相对速度向量排除指向, relative velocity
-            //Vector3D ra = Vector3D.Reject(TargetVel, tarN); //相对加速度，可不考虑
-            Vector3D ra = Vector3D.Zero; //relative accleration
-            //计算不需要的速度
-            Vector3D rvN = Vector3D.Normalize(rv); //排除后的相对速度单位指向, relative velocity normalized
-            double newlen = Math.Atan2(rv.Length(), 5); //相对速度的大小，通过Atan2限定
-            Vector3D newrv = rvN * newlen;
-            double GuideRate = 0.3;
-            Vector3D rdo = newrv * GuideRate * 60 + ra * 0.5; //侧向加速度
-            //计算抵消重力需要的加速度
-            Vector3D rd = rdo - Remote.GetNaturalGravity(); //需要抵消掉的加速度
-            //double rdl = rd.Length();
-            //剩余加速度
-            Vector3D rd2 = Vector3D.Reject(rd, tarN); //需要的侧向加速度
-            double rd2l = rd2.Length();
-            if (missileAcc < rd2l) missileAcc = rd2l;
-            double pdl = Math.Sqrt(missileAcc * missileAcc - rd2l * rd2l);
-            //剩余加速度方向
-            //剩余加速度
-            Vector3D pd = tarN * pdl;
-            //总加速度
-            Vector3D sd = pd + rd2;
-            //总加速度方向
-            Vector3D nam = Vector3D.Normalize(sd);
-            var missileLookAt = MatrixD.CreateLookAt(new Vector3D(), Remote.WorldMatrix.Up, Remote.WorldMatrix.Backward);
-            var amToMe = Vector3D.TransformNormal(nam, missileLookAt);
-            Echo(nam.ToString("F2"));
-            Echo(amToMe.ToString("F2"));
+                BreakThroughCount = BreakThroughCount > 0 ? BreakThroughCount -= 1 : 0;
+                if(BreakThroughCount == 0)
+                {
+                    Random rnd = new Random();
+                    BreakThroughCount = rnd.Next(10, 40);
+                    BreakThroughOffset = new Vector3D(rnd.Next(-30, 30), rnd.Next(-30, 30), rnd.Next(-30, 30));
+                }
+                Vector3D offset3D = new Vector3D(BreakThroughOffset.X / 180 * Math.PI, BreakThroughOffset.Y / 180 * Math.PI, BreakThroughOffset.Z / 180 * Math.PI);
+                Quaternion offset = new Quaternion((float)(Math.Cos(offset3D.Y * 0.5f) * Math.Sin(offset3D.X * 0.5f) * Math.Cos(offset3D.Z * 0.5f) + Math.Sin(offset3D.Y * 0.5f) * Math.Cos(offset3D.X * 0.5f) * Math.Sin(offset3D.Z * 0.5f)),
+                                                (float)(Math.Cos(offset3D.Y * 0.5f) * Math.Cos(offset3D.X * 0.5f) * Math.Sin(offset3D.Z * 0.5f) - Math.Sin(offset3D.Y * 0.5f) * Math.Sin(offset3D.X * 0.5f) * Math.Cos(offset3D.Z * 0.5f)),
+                                                (float)(Math.Sin(offset3D.Y * 0.5f) * Math.Cos(offset3D.X * 0.5f) * Math.Cos(offset3D.Z * 0.5f) - Math.Cos(offset3D.Y * 0.5f) * Math.Sin(offset3D.X * 0.5f) * Math.Sin(offset3D.Z * 0.5f)),
+                                                (float)(Math.Cos(offset3D.Y * 0.5f) * Math.Cos(offset3D.X * 0.5f) * Math.Cos(offset3D.Z * 0.5f) + Math.Sin(offset3D.Y * 0.5f) * Math.Sin(offset3D.X * 0.5f) * Math.Sin(offset3D.Z * 0.5f)));
+                posAngle = Vector3D.Transform(posAngle, offset);
+            }    
 
-            ////排除不需要的速度
-            //Vector3D tarN = Vector3D.Normalize(TargetPos - Remote.GetPosition()); //当前导弹位置指向目标位置的单位指向, target normalized
-            //Vector3D rv = Vector3D.Reject(TargetVel - Remote.GetShipSpeed(), tarN); //相对速度向量排除指向, relative velocity
-            ////计算不需要的速度
-            //Vector3D rvN = Vector3D.Normalize(rv); //排除后的相对速度单位指向, relative velocity normalized
-            //Vector3D pd = Vector3D.Normalize(tarN);
-            //Vector3D sd = pd + rvN - Remote.GetNaturalGravity();
-            //Vector3D nam = Vector3D.Normalize(sd);
-            //var missileLookAt = MatrixD.CreateLookAt(new Vector3D(), Remote.WorldMatrix.Up, Remote.WorldMatrix.Backward);
-            //var amToMe = Vector3D.TransformNormal(nam, missileLookAt);
-            //Echo(nam.ToString("F2"));
-            //Echo(amToMe.ToString("F2"));
-
+            Echo(posAngle.ToString());
             foreach (var Gyr in Gyros)
             {
-                Gyr.SetValue("Pitch", (float)amToMe.Y * -60f);
-                Gyr.SetValue("Yaw", (float)amToMe.X * -60f);
+                Gyr.SetValue("Pitch", (float)posAngle.Y * 60f);
+                Gyr.SetValue("Yaw", (float)posAngle.X * -60f);
             }
         }
         void Launch()
@@ -256,7 +215,7 @@ namespace SEScript
             }
             foreach (var item in Thrusts)
             {
-                item.ThrustOverridePercentage = 0.1f;
+                item.ThrustOverridePercentage = 1f;
             }
             TimeStamp = 0;
         }

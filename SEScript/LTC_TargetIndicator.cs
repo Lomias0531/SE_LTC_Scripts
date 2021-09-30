@@ -22,6 +22,7 @@ namespace SEScript
         List<IMyGyro> gyros;
         List<IMySoundBlock> sound;
         Vector3D TargetPos;
+        Vector3D TargetOffset;
         void Main(string msg)
         {
             if (!Checked)
@@ -134,22 +135,36 @@ namespace SEScript
         void TrackTarget()
         {
             SelectedTarget = GetTarget(TargetPos);
-            if (!SelectedTarget.IsEmpty())
-            {
-                TargetPos = SelectedTarget.BoundingBox.Center;
-            }
-            else
+            if (SelectedTarget.IsEmpty())
             {
                 ResumeIdle();
                 return;
             }
+
+            Vector3D posmove = Vector3D.TransformNormal(TargetOffset, SelectedTarget.Orientation);
+            Vector3D targetPos;
+            if(TargetOffset.X == 0 && TargetOffset.Y == 0 && TargetOffset.Z == 0)
+            {
+                targetPos = (Vector3D)SelectedTarget.HitPosition;
+            }else
+            {
+                targetPos = SelectedTarget.Position + posmove + SelectedTarget.Velocity / 60;
+            }
+
             MatrixD matrix = MatrixD.CreateLookAt(new Vector3D(), controller.WorldMatrix.Forward, controller.WorldMatrix.Up);
-            Vector3D posAngle = Vector3D.Normalize(Vector3D.TransformNormal(TargetPos - controller.GetPosition(), matrix));
-            Echo(TargetPos.ToString("F2"));
+            Vector3D posAngle = Vector3D.Normalize(Vector3D.TransformNormal(targetPos - controller.GetPosition(), matrix));
+            Echo(targetPos.ToString("F2"));
             Echo(posAngle.ToString("F2"));
+            Echo(TargetOffset.ToString("F2"));
 
             HoriRot.TargetVelocityRPM = (float)posAngle.Y * 50;
             VertRot.TargetVelocityRPM = (float)posAngle.X * 50;
+
+            MatrixD TargetLookAtMatrix = MatrixD.CreateLookAt(new Vector3D(), SelectedTarget.Orientation.Forward, SelectedTarget.Orientation.Up);
+            Vector3D hitpos = (Vector3D)SelectedTarget.HitPosition;
+            hitpos = hitpos + Vector3D.Normalize(hitpos - (Vector3D)controller.Position) * 2;
+            TargetOffset = Vector3D.TransformNormal(hitpos - SelectedTarget.Position, TargetLookAtMatrix);
+            TargetPos = (Vector3D)SelectedTarget.HitPosition;
         }
         void LockTarget()
         {
@@ -161,7 +176,8 @@ namespace SEScript
                     item.Play();
                 }
             }
-            TargetPos = SelectedTarget.BoundingBox.Center;
+            TargetPos = (Vector3D)SelectedTarget.HitPosition;
+            //TargetPos = SelectedTarget.BoundingBox.Center;
             Locked = true;
             foreach (var gyro in gyros)
             {
@@ -184,6 +200,7 @@ namespace SEScript
             {
                 gyro.GyroOverride = false;
             }
+            TargetOffset = new Vector3D();
             Echo("No target");
             FireControl.CustomData += "FireControl|IndicatorIdle|+";
         }
@@ -202,7 +219,7 @@ namespace SEScript
             MyDetectedEntityInfo target = new MyDetectedEntityInfo();
             foreach (var camera in camArray)
             {
-                if(camera.TimeUntilScan(Range) == 0)
+                if(camera.CanScan(Range))
                 {
                     target = camera.Raycast(Range);
                     return target;
@@ -215,7 +232,7 @@ namespace SEScript
             MyDetectedEntityInfo target = new MyDetectedEntityInfo();
             foreach (var camera in camArray)
             {
-                if (camera.TimeUntilScan(Vector3D.Distance(targetPos,camera.GetPosition()) + 100) == 0)
+                if (camera.CanScan(targetPos))
                 {
                     target = camera.Raycast(targetPos);
                     return target;

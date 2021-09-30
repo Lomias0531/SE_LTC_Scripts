@@ -34,7 +34,7 @@ namespace SEScript
         Vector3D targetVel;
         float shellSpeed = 265.17f;
         TurretStatus curStatus = TurretStatus.Idle;
-        //Vector3D aimOffset = new Vector3D(0, 0, 0); //炮口方向修正
+        Vector3D aimOffset = new Vector3D(0, 0, -1f); //炮口方向修正
         enum TurretStatus
         {
             Aiming,
@@ -127,11 +127,18 @@ namespace SEScript
                 AimingLag = 0;
                 return;
             }
+            Vector3D offset3D = new Vector3D(aimOffset.X / 180 * Math.PI, aimOffset.Y / 180 * Math.PI, aimOffset.Z / 180 * Math.PI);
+            Quaternion offset = new Quaternion((float)(Math.Cos(offset3D.Y * 0.5f) * Math.Sin(offset3D.X * 0.5f) * Math.Cos(offset3D.Z * 0.5f) + Math.Sin(offset3D.Y * 0.5f) * Math.Cos(offset3D.X * 0.5f) * Math.Sin(offset3D.Z * 0.5f)),
+                                                (float)(Math.Cos(offset3D.Y * 0.5f) * Math.Cos(offset3D.X * 0.5f) * Math.Sin(offset3D.Z * 0.5f) - Math.Sin(offset3D.Y * 0.5f) * Math.Sin(offset3D.X * 0.5f) * Math.Cos(offset3D.Z * 0.5f)),
+                                                (float)(Math.Sin(offset3D.Y * 0.5f) * Math.Cos(offset3D.X * 0.5f) * Math.Cos(offset3D.Z * 0.5f) - Math.Cos(offset3D.Y * 0.5f) * Math.Sin(offset3D.X * 0.5f) * Math.Sin(offset3D.Z * 0.5f)),
+                                                (float)(Math.Cos(offset3D.Y * 0.5f) * Math.Cos(offset3D.X * 0.5f) * Math.Cos(offset3D.Z * 0.5f) + Math.Sin(offset3D.Y * 0.5f) * Math.Sin(offset3D.X * 0.5f) * Math.Sin(offset3D.Z * 0.5f)));
+
             MatrixD matrix = MatrixD.CreateLookAt(new Vector3D(), remote.WorldMatrix.Forward, remote.WorldMatrix.Up);
-            Vector3D posAngle = Vector3D.Normalize(Vector3D.TransformNormal(pos - remote.GetPosition(), matrix));
+            Vector3D posAngle = Vector3D.Normalize(Vector3D.TransformNormal(Vector3D.Transform(pos - remote.GetPosition(),offset), matrix));
+            
             double distance = Vector3D.Distance(remote.GetPosition(), pos);
             fireCD = distance > 1500 ? ((float)distance / 1000f) * 300f : 300f;
-            if (posAngle.X > -0.01f && posAngle.X < 0.01f && posAngle.Y > -0.01f && posAngle.Y < 0.01f && isFiring)
+            if (posAngle.X > -0.001f && posAngle.X < 0.001f && posAngle.Y > -0.001f && posAngle.Y < 0.001f && isFiring)
             {
                 Fire();
             }

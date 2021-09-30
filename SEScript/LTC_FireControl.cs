@@ -31,6 +31,10 @@ namespace SEScript
             Halt,
         }
         List<VRage.Game.MyRelationsBetweenPlayerAndBlock> TargetFilter = new List<VRage.Game.MyRelationsBetweenPlayerAndBlock>() { VRage.Game.MyRelationsBetweenPlayerAndBlock.Enemies};
+        Program()
+        {
+            Runtime.UpdateFrequency = UpdateFrequency.Update1;
+        }
         void Main(string arg)
         {
             if(!CheckReady)
@@ -106,7 +110,7 @@ namespace SEScript
             foreach (IMyLargeTurretBase tut in AutoWeapons)
             {
                 MyDetectedEntityInfo target = tut.GetTargetedEntity();
-                if(TargetFilter.Contains(target.Relationship))
+                if(TargetFilter.Contains(target.Relationship) || target.Type == MyDetectedEntityType.Missile)
                     ShortRangeScanTargets.Add(target);
             }
             if (AllScanTargets.Count > 0)
@@ -451,6 +455,24 @@ namespace SEScript
                 if(string.IsNullOrEmpty(msg))
                     Me.CustomData = "";
             }            
+        }
+        string SerializeTarget(MyDetectedEntityInfo target)
+        {
+            string result = "{";
+            result += target.EntityId.ToString() + ",";
+            result += target.Name + ",";
+            result += ((int)target.Type).ToString() + ",";
+            result += ((Vector3D)target.HitPosition).ToString() + ",";
+            result += ",";
+            result += ((Vector3D)target.Velocity).ToString() + ",";
+            result += ((int)target.Relationship).ToString() + ",";
+            result += "}";
+            return result;
+        }
+        MyDetectedEntityInfo DeserializeTarget(string target)
+        {
+            MyDetectedEntityInfo result = new MyDetectedEntityInfo();
+            return result;
         }
     }
 }
