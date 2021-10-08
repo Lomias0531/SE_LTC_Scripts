@@ -24,6 +24,9 @@ namespace SEScript
         Random rnd;
         int ScanOffsetX;
         int ScanOffsetY;
+        List<Vector3D> MissileTargets;
+        int displayCount = 0;
+        int missileCount = 0;
         enum WeaponMode
         {
             Manual,
@@ -34,6 +37,7 @@ namespace SEScript
         Program()
         {
             Runtime.UpdateFrequency = UpdateFrequency.Update1;
+            (Me as IMyProgrammableBlock).TryRun("Default");
         }
         void Main(string arg)
         {
@@ -41,11 +45,8 @@ namespace SEScript
             {
                 CheckComponents();
             }
+            DisplayInfo();
             ExecuteCommands(arg);
-            Echo("Targets: " + AllScanTargets.Count);
-            Echo("Turrets: " + Turrets.Count);
-            Echo("PointDefenses: " + PointDefenses.Count);
-            Echo("Cams: " + GetAvailableScanner().Count);
             switch(curMode)
             {
                 default:
@@ -53,6 +54,28 @@ namespace SEScript
                         break;
                     }
             }
+        }
+        void DisplayInfo()
+        {
+            displayCount = displayCount > 120 ? 0 : displayCount += 1;
+            if(displayCount > 60)
+            {
+                if(AllScanTargets.Count>0)
+                {
+                    Echo("=====COMBATING=====");
+                }
+                else
+                {
+                    Echo("=====SCANNING======");
+                }
+            }else
+            {
+                Echo(" ");
+            }
+            Echo("Targets: " + AllScanTargets.Count);
+            Echo("Turrets: " + Turrets.Count);
+            Echo("PointDefenses: " + PointDefenses.Count);
+            Echo("Cams: " + GetAvailableScanner().Count);
         }
         void CheckComponents()
         {
@@ -324,7 +347,7 @@ namespace SEScript
                             {
                                 if (item.GetId() == long.Parse(curCmd[2]))
                                 {
-                                    item.CustomData = "Turret|Target|" + AllScanTargets[index].Position.X + "_" + AllScanTargets[index].Position.Y + "_" + AllScanTargets[index].Position.Z + "_" + AllScanTargets[index].Velocity.X + "_" + AllScanTargets[index].Velocity.Y + "_" + AllScanTargets[index].Velocity.Z;
+                                    item.CustomData = "Turret|Target|" + AllScanTargets[index].Position.ToString() + "," + AllScanTargets[index].Velocity.ToString();
                                 }
                             }
                             break;
@@ -348,7 +371,7 @@ namespace SEScript
                             {
                                 if (item.GetId() == long.Parse(curCmd[2]))
                                 {
-                                    item.CustomData = "PointDefense|Target|" + ShortRangeScanTargets[index].Position.X + "_" + ShortRangeScanTargets[index].Position.Y + "_" + ShortRangeScanTargets[index].Position.Z;
+                                    item.CustomData = "PointDefense|Target|" + ShortRangeScanTargets[index].Position.ToString();
                                 }
                             }
                             break;
@@ -360,26 +383,25 @@ namespace SEScript
                                 item.CustomData = "Turret|KeepTarget|" + curCmd[2];
                             }
 
-                            string[] pos = curCmd[2].Split('_');
-                            List<IMyCameraBlock> scanners = GetAvailableScanner();
-                            float x = float.Parse(pos[0]);
-                            float y = float.Parse(pos[1]);
-                            float z = float.Parse(pos[2]);
-                            for (int s = 0; s < 10; s++)
-                            {
-                                foreach (var cam in scanners)
-                                {
-                                    MyDetectedEntityInfo detect = cam.Raycast(new Vector3D(x, y, z));
-                                    if (!detect.IsEmpty())
-                                    {
-                                        if (!LongRangeScanTargets.Contains(detect))
-                                        {
-                                            LongRangeScanTargets.Add(detect);
-                                        }
-                                        break;
-                                    }
-                                }
-                            }
+                            //List<IMyCameraBlock> scanners = GetAvailableScanner();
+                            //Vector3D ScanPos = new Vector3D();
+                            //string[] target = curCmd[2].Split(',');
+                            //Vector3D.TryParse(target[0], out ScanPos);
+                            //for (int s = 0; s < 10; s++)
+                            //{
+                            //    foreach (var cam in scanners)
+                            //    {
+                            //        MyDetectedEntityInfo detect = cam.Raycast(ScanPos);
+                            //        if (!detect.IsEmpty())
+                            //        {
+                            //            if (!LongRangeScanTargets.Contains(detect))
+                            //            {
+                            //                LongRangeScanTargets.Add(detect);
+                            //            }
+                            //            break;
+                            //        }
+                            //    }
+                            //}
                             break;
                         }
                     case "MissileLaunchAt": //导弹发射
@@ -387,6 +409,14 @@ namespace SEScript
                             CommandBlocks.Clear();
                             GridTerminalSystem.GetBlocksOfType(CommandBlocks);
                             MissileLaunchers.Clear();
+                            MissileTargets = new List<Vector3D>();
+                            string[] targets = curCmd[2].Split(',');
+                            foreach (var target in targets)
+                            {
+                                Vector3D pos = new Vector3D();
+                                Vector3D.TryParse(target, out pos);
+                                MissileTargets.Add(pos);
+                            }
                             foreach (var item in CommandBlocks)
                             {
                                 if (item.CustomName.Contains("LTC_Missile"))
@@ -396,30 +426,29 @@ namespace SEScript
                             }
                             foreach (var item in MissileLaunchers)
                             {
-                                item.CustomData = "Missile|Launch|" + curCmd[2];
-                                item.TryRun("Missile|Launch|" + curCmd[2]);
+                                int index = rnd.Next(0, MissileTargets.Count - 2);
+                                item.CustomData = "Missile|Launch|" + MissileTargets[index].ToString();
+                                item.TryRun("Missile|Launch|" + MissileTargets[index].ToString());
                             }
 
-                            string[] pos = curCmd[2].Split('_');
-                            List<IMyCameraBlock> scanners = GetAvailableScanner();
-                            float x = float.Parse(pos[0]);
-                            float y = float.Parse(pos[1]);
-                            float z = float.Parse(pos[2]);
-                            for (int s = 0; s < 10; s++)
-                            {
-                                foreach (var cam in scanners)
-                                {
-                                    MyDetectedEntityInfo detect = cam.Raycast(new Vector3D(x, y, z));
-                                    if (!detect.IsEmpty())
-                                    {
-                                        if (!LongRangeScanTargets.Contains(detect))
-                                        {
-                                            LongRangeScanTargets.Add(detect);
-                                        }
-                                        break;
-                                    }
-                                }
-                            }
+                            //List<IMyCameraBlock> scanners = GetAvailableScanner();
+                            //Vector3D ScanPos = new Vector3D();
+                            //Vector3D.TryParse(curCmd[2], out ScanPos);
+                            //for (int s = 0; s < 10; s++)
+                            //{
+                            //    foreach (var cam in scanners)
+                            //    {
+                            //        MyDetectedEntityInfo detect = cam.Raycast(ScanPos);
+                            //        if (!detect.IsEmpty())
+                            //        {
+                            //            if (!LongRangeScanTargets.Contains(detect))
+                            //            {
+                            //                LongRangeScanTargets.Add(detect);
+                            //            }
+                            //            break;
+                            //        }
+                            //    }
+                            //}
                             break;
                         }
                     case "IndicatorIdle": //目标指示器未选择目标

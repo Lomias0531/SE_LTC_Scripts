@@ -210,11 +210,7 @@ namespace SEScript
                     }
                 case "Target":
                     {
-                        string[] pos = cmd1[2].Split('_');
-                        float x = float.Parse(pos[0]);
-                        float y = float.Parse(pos[1]);
-                        float z = float.Parse(pos[2]);
-                        TargetPos = new Vector3D(x, y, z);
+                        Vector3D.TryParse(cmd1[2], out TargetPos);
                         curStatus = PointStatus.Firing;
                         break;
                     }

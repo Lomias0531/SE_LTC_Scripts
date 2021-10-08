@@ -23,6 +23,8 @@ namespace SEScript
         List<IMySoundBlock> sound;
         Vector3D TargetPos;
         Vector3D TargetOffset;
+        Random rnd = new Random();
+        int TargetCount = 0;
         void Main(string msg)
         {
             if (!Checked)
@@ -134,13 +136,6 @@ namespace SEScript
         }
         void TrackTarget()
         {
-            SelectedTarget = GetTarget(TargetPos);
-            if (SelectedTarget.IsEmpty())
-            {
-                ResumeIdle();
-                return;
-            }
-
             Vector3D posmove = Vector3D.TransformNormal(TargetOffset, SelectedTarget.Orientation);
             Vector3D targetPos;
             if(TargetOffset.X == 0 && TargetOffset.Y == 0 && TargetOffset.Z == 0)
@@ -160,11 +155,28 @@ namespace SEScript
             HoriRot.TargetVelocityRPM = (float)posAngle.Y * 50;
             VertRot.TargetVelocityRPM = (float)posAngle.X * 50;
 
+            SelectedTarget = GetTarget(targetPos);
+            if (SelectedTarget.IsEmpty())
+            {
+                ResumeIdle();
+                return; 
+            }
+
             MatrixD TargetLookAtMatrix = MatrixD.CreateLookAt(new Vector3D(), SelectedTarget.Orientation.Forward, SelectedTarget.Orientation.Up);
             Vector3D hitpos = (Vector3D)SelectedTarget.HitPosition;
-            hitpos = hitpos + Vector3D.Normalize(hitpos - (Vector3D)controller.Position) * 2;
+            //hitpos = hitpos + Vector3D.Normalize(hitpos - (Vector3D)controller.Position) * 2;
             TargetOffset = Vector3D.TransformNormal(hitpos - SelectedTarget.Position, TargetLookAtMatrix);
             TargetPos = (Vector3D)SelectedTarget.HitPosition;
+
+            Vector3D hitPos = (Vector3D)SelectedTarget.HitPosition;
+
+            TargetCount = TargetCount > 20 ? 0 : TargetCount += 1;
+
+            if(TargetCount == 0)
+            {
+                FireControl.CustomData += "FireControl|TurretAimAt|" + hitPos.ToString() + "," + SelectedTarget.Velocity.ToString() + "|+";
+                FireControl.CustomData += "FireControl|MissileLaunchAt|" + hitPos.ToString() + "," + SelectedTarget.Velocity.ToString() + "|+";
+            }
         }
         void LockTarget()
         {
@@ -216,29 +228,27 @@ namespace SEScript
         }
         MyDetectedEntityInfo GetTarget(int Range)
         {
-            MyDetectedEntityInfo target = new MyDetectedEntityInfo();
             foreach (var camera in camArray)
             {
                 if(camera.CanScan(Range))
                 {
-                    target = camera.Raycast(Range);
+                    MyDetectedEntityInfo target = camera.Raycast(Range);
                     return target;
                 }
             }
-            return target;
+            return new MyDetectedEntityInfo();
         }
         MyDetectedEntityInfo GetTarget(Vector3D targetPos)
         {
-            MyDetectedEntityInfo target = new MyDetectedEntityInfo();
             foreach (var camera in camArray)
             {
                 if (camera.CanScan(targetPos))
                 {
-                    target = camera.Raycast(targetPos);
+                    MyDetectedEntityInfo target = camera.Raycast(targetPos);
                     return target;
                 }
             }
-            return target;
+            return new MyDetectedEntityInfo();
         }
         void DeseralizeMsg(string msg)
         {
@@ -256,8 +266,7 @@ namespace SEScript
                         SelectTarget();
                         if (!SelectedTarget.IsEmpty())
                         {
-                            Vector3D hitPos = (Vector3D)SelectedTarget.HitPosition;
-                            FireControl.CustomData += "FireControl|TurretAimAt|" + hitPos.X.ToString() + "_" + hitPos.Y.ToString() + "_" + hitPos.Z.ToString() + "_" + SelectedTarget.Velocity.X + "_" + SelectedTarget.Velocity.Y + "_" + SelectedTarget.Velocity.Z + "|+";
+                            FireControl.CustomData += "FireControl|TurretAimAt|" + ((Vector3D)SelectedTarget.HitPosition).ToString() + "," + ((Vector3D)SelectedTarget.Velocity).ToString() + "|+";
                             LockTarget();
                         }
                         break;
@@ -267,7 +276,20 @@ namespace SEScript
                         SelectTarget();
                         if (!SelectedTarget.IsEmpty())
                         {
-                            FireControl.CustomData += "FireControl|MissileLaunchAt|" + SelectedTarget.Position.X.ToString() + "_" + SelectedTarget.Position.Y.ToString() + "_" + SelectedTarget.Position.Z.ToString() + "_" + SelectedTarget.Velocity.X + "_" + SelectedTarget.Velocity.Y + "_" + SelectedTarget.Velocity.Z + "|+";
+                            string TargetPack = "";
+                            double targetXL = SelectedTarget.BoundingBox.Size.X * 0.7;
+                            double targetYL = SelectedTarget.BoundingBox.Size.Y * 0.7;
+                            double targetZL = SelectedTarget.BoundingBox.Size.Z * 0.7;
+                            for (int i = 0;i<10;i++)
+                            {
+                                double x = (rnd.NextDouble() - 0.5) * targetXL;
+                                double y = (rnd.NextDouble() - 0.5) * targetYL;
+                                double z = (rnd.NextDouble() - 0.5) * targetZL;
+                                Vector3D offset = Vector3D.TransformNormal(new Vector3D(x, y, z), SelectedTarget.Orientation);
+                                Vector3D missileOffset = new Vector3D(SelectedTarget.Position.X + offset.X, SelectedTarget.Position.Y + offset.Y, SelectedTarget.Position.Z + offset.Z);
+                                TargetPack += missileOffset.ToString() + ",";
+                            }
+                            FireControl.CustomData += "FireControl|MissileLaunchAt|" + TargetPack + "," + ((Vector3D)SelectedTarget.Velocity).ToString() + "|+";
                             LockTarget();
                         }
                         break;
