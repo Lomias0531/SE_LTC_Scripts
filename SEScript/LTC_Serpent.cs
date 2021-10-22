@@ -214,32 +214,6 @@ namespace SEScript
 
             //Vector3D posAngle = amToMe;
 
-            ////Commence breakthrough action
-            //var distance = (TargetPos - Remote.CubeGrid.WorldVolume.Center).Length();
-            //if (distance <= 0)
-            //{
-            //    Echo("Evading");
-            //    BreakThroughCount = BreakThroughCount > 0 ? BreakThroughCount -= 1 : 0;
-            //    if (BreakThroughCount == 0)
-            //    {
-            //        BreakThroughCount = rnd.Next(10, 40);
-            //        var offsetScale = (distance - 500) > 0 ? (distance - 500) / 300 : 0;
-            //        BreakThroughOffset = new Vector3D(rnd.Next(-30, 30) * offsetScale, rnd.Next(-30, 30) * offsetScale, rnd.Next(-30, 30) * offsetScale);
-            //    }
-            //    Vector3D offset3D = new Vector3D(BreakThroughOffset.X / 180 * Math.PI, BreakThroughOffset.Y / 180 * Math.PI, BreakThroughOffset.Z / 180 * Math.PI);
-            //    Quaternion offset = new Quaternion((float)(Math.Cos(offset3D.Y * 0.5f) * Math.Sin(offset3D.X * 0.5f) * Math.Cos(offset3D.Z * 0.5f) + Math.Sin(offset3D.Y * 0.5f) * Math.Cos(offset3D.X * 0.5f) * Math.Sin(offset3D.Z * 0.5f)),
-            //                                    (float)(Math.Cos(offset3D.Y * 0.5f) * Math.Cos(offset3D.X * 0.5f) * Math.Sin(offset3D.Z * 0.5f) - Math.Sin(offset3D.Y * 0.5f) * Math.Sin(offset3D.X * 0.5f) * Math.Cos(offset3D.Z * 0.5f)),
-            //                                    (float)(Math.Sin(offset3D.Y * 0.5f) * Math.Cos(offset3D.X * 0.5f) * Math.Cos(offset3D.Z * 0.5f) - Math.Cos(offset3D.Y * 0.5f) * Math.Sin(offset3D.X * 0.5f) * Math.Sin(offset3D.Z * 0.5f)),
-            //                                    (float)(Math.Cos(offset3D.Y * 0.5f) * Math.Cos(offset3D.X * 0.5f) * Math.Cos(offset3D.Z * 0.5f) + Math.Sin(offset3D.Y * 0.5f) * Math.Sin(offset3D.X * 0.5f) * Math.Sin(offset3D.Z * 0.5f)));
-            //    posAngle = Vector3D.Transform(posAngle, offset);
-            //}
-
-            //Echo(posAngle.ToString("F2"));
-            //Echo("Target position: " + TargetPos.ToString("F2"));
-            //Echo("Position: " + Remote.CubeGrid.WorldVolume.Center.ToString("F2"));
-            //Echo("Speed: " + Remote.GetShipVelocities().LinearVelocity.ToString("F2"));
-            //Echo("Target distance: " + (TargetPos - Remote.CubeGrid.WorldVolume.Center).Length().ToString("F2"));
-
 
             Vector3D MissilePosition = Gyros[0].CubeGrid.WorldVolume.Center;
             Vector3D MissilePositionPrev = MissilePosPev;
