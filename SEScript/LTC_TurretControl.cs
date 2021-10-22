@@ -336,6 +336,10 @@ namespace SEScript
                         {
                             pis.Retract();
                         }
+                        foreach (var welder in wld)
+                        {
+                            welder.Enabled = true;
+                        }
                         curReload = ReloadStatus.Retracting;
                         break;
                     }
