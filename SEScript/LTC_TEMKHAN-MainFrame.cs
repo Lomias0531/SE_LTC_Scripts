@@ -9,7 +9,7 @@ namespace SEScript
     class LTC_TEMKHAN_MainFrame:API
     {
         //T.E.M.K.H.A.N.
-        //Tactical Explortion Multi K H Antenna Network
+        //Tactical Extended Multi-Key Harmonized Antenna Network
         List<TargetStandard> targets;
         List<MissileStandard> missiles;
         bool CheckReady = false;
