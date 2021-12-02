@@ -17,9 +17,11 @@ namespace SEScript
         List<IMyBroadcastListener> broadcastListeners;
         enum TargetType
         {
-            Hostile,
-            Friendly,
-            Missile,
+            HostileObject,
+            FriendlyShip,
+            LaunchedMissile,
+            FriendlyScout,
+            FriendlyProbe,
         }
         Program()
         {
@@ -47,6 +49,8 @@ namespace SEScript
             Runtime.UpdateFrequency = UpdateFrequency.Update1;
             listener = IGC.UnicastListener;
             broadcastListeners = new List<IMyBroadcastListener>();
+            IMyBroadcastListener MissileChannelListener = IGC.RegisterBroadcastListener("MissilesChannel");
+            broadcastListeners.Add(MissileChannelListener);
         }
         void CheckMissileStatus()
         {
@@ -60,6 +64,13 @@ namespace SEScript
                     continue;
                 }
                 IGC.SendUnicastMessage(missiles[i].TargetID, "MissilesChannel", "Missile|Check_Status|");
+            }
+        }
+        IEnumerator StartChannelListening(IMyBroadcastListener listener,string Channel)
+        {
+            while(listener.HasPendingMessage)
+            {
+                
             }
         }
         void CheckHostileStatus()
