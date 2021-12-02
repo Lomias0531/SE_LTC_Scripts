@@ -22,20 +22,20 @@ namespace SEScript
         IMyProgrammableBlock FireControl;
 
         bool CheckReady = false; //组件初始化
-        float fireCount = 0; //开火计数
-        float fireCD = 300f; //开火冷却，避免因为下一发炮弹刷新掉前一发
+        //float fireCount = 0; //开火计数
+        //float fireCD = 300f; //开火冷却，避免因为下一发炮弹刷新掉前一发
 
-        //float reloadTime = 200f; //装弹计数
+        float reloadTime = 0f; //装弹计数
         //float reloadLength = 200f; //装弹冷却
 
         int AimingLag = 0; //开火阻碍倒计时，若长时间无法击发则重新申请目标
 
         Vector3D targetPos;
         Vector3D targetVel;
-        float shellSpeed = 265.17f; //弹速
+        float shellSpeed = 459.88f; //弹速
         TurretStatus curStatus = TurretStatus.Idle; //炮塔索敌状态
         ReloadStatus curReload = ReloadStatus.Ready; //装弹状态
-        Vector3D aimOffset = new Vector3D(0, 0, 0.5f); //炮口方向修正
+        Vector3D aimOffset = new Vector3D(0, 0, -0.5f); //炮口方向修正
         enum TurretStatus
         {
             Aiming,
@@ -58,10 +58,10 @@ namespace SEScript
                 CheckComponents();
                 return;
             }
-            fireCount = (fireCount > 0) ? fireCount -= 1 : 0;
+            //fireCount = (fireCount > 0) ? fireCount -= 1 : 0;
             Echo("Running");
             Reload();
-            Echo("Fire: " + fireCount.ToString() + "/" + fireCD.ToString());
+            //Echo("Fire: " + fireCount.ToString() + "/" + fireCD.ToString());
             Echo("Reload: " + curReload.ToString());
             DeseralizeMsg(msg);
             switch(curStatus)
@@ -163,7 +163,7 @@ namespace SEScript
             Vector3D posAngle = Vector3D.Normalize(Vector3D.TransformNormal(Vector3D.Transform(pos - remote.GetPosition(),offset), matrix));
             
             double distance = Vector3D.Distance(remote.GetPosition(), pos);
-            fireCD = distance > 1500 ? ((float)distance / 1000f) * 300f : 300f;
+            //fireCD = distance > 1500 ? ((float)distance / 1000f) * 300f : 300f;
             if (posAngle.X > -0.001f && posAngle.X < 0.001f && posAngle.Y > -0.001f && posAngle.Y < 0.001f && isFiring)
             {
                 Fire();
@@ -314,18 +314,21 @@ namespace SEScript
             {
                 case ReloadStatus.Fired:
                     {
+                        //if (GetPistionStatus() != 0) return;
                         foreach (var pis in pistons)
                         {
                             pis.Extend();
                         }
                         curReload = ReloadStatus.Extending;
+                        reloadTime = 0;
                         break;
                     }
                 case ReloadStatus.Extending:
                     {
-                        if (GetPistionStatus() == 2)
+                        Trigger.Detach();
+                        Trigger.Attach();
+                        if (Trigger.IsAttached)
                         {
-                            Trigger.Attach();
                             curReload = ReloadStatus.Attached;
                         }
                         break;
@@ -341,11 +344,16 @@ namespace SEScript
                             welder.Enabled = true;
                         }
                         curReload = ReloadStatus.Retracting;
+                        reloadTime = 0;
                         break;
                     }
                 case ReloadStatus.Retracting:
                     {
-                        if (GetPistionStatus() == 2)
+                        if (GetPistionStatus() == 0)
+                        {
+                            reloadTime += 1;
+                        }
+                        if(reloadTime > 30)
                         {
                             curReload = ReloadStatus.Ready;
                         }
@@ -360,20 +368,32 @@ namespace SEScript
         int GetPistionStatus()
         {
             int Reversed = 1;
+            int MoveCount = 0;
             foreach (var pis in pistons)
             {
-                if(pis.Status == PistonStatus.Extended)
+                Echo(pis.Status.ToString());
+                switch(pis.Status)
                 {
-                    Reversed = 2;//完全伸展
-                }else if(pis.Status == PistonStatus.Retracted)
-                {
-                    Reversed = 0;//完全收缩
-                }else
-                {
-                    Reversed = 1;//其他状态
+                    case PistonStatus.Extended:
+                        {
+                            Reversed = 2;
+                            MoveCount += 1;
+                            break;
+                        }
+                    case PistonStatus.Retracted:
+                        {
+                            Reversed = 0;
+                            MoveCount += 1;
+                            break;
+                        }
                 }
             }
-            return Reversed;
+            Echo(MoveCount.ToString() + "/" + pistons.Count + " - " + Reversed.ToString());
+            if(MoveCount>=pistons.Count-2)
+            {
+                return Reversed;
+            }
+            return 1;
         }
         /// <summary>
         /// 射击
@@ -386,10 +406,10 @@ namespace SEScript
                 FireControl.CustomData += "FireControl|TurretRequestTarget|" + Me.GetId() + "|+";
                 return;
             }
-            if (fireCount == 0 && curReload == ReloadStatus.Ready)
+            if (curReload == ReloadStatus.Ready)
             {
                 TriggerBlock.Trigger();
-                fireCount = fireCD;
+                //fireCount = fireCD;
                 foreach (var welder in wld)
                 {
                     welder.Enabled = false;
