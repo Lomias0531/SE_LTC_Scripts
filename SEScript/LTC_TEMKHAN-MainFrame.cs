@@ -1,4 +1,5 @@
-﻿using Sandbox.ModAPI.Ingame;
+﻿using Sandbox.Game.Entities;
+using Sandbox.ModAPI.Ingame;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -70,7 +71,7 @@ namespace SEScript
         {
             while(listener.HasPendingMessage)
             {
-                
+
             }
         }
         void CheckHostileStatus()

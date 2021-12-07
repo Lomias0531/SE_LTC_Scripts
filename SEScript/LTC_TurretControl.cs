@@ -35,7 +35,7 @@ namespace SEScript
         float shellSpeed = 459.88f; //弹速
         TurretStatus curStatus = TurretStatus.Idle; //炮塔索敌状态
         ReloadStatus curReload = ReloadStatus.Ready; //装弹状态
-        Vector3D aimOffset = new Vector3D(0, 0, -0.5f); //炮口方向修正
+        Quaternion aimOffset = new Quaternion(); //炮口方向修正
         enum TurretStatus
         {
             Aiming,
@@ -152,15 +152,10 @@ namespace SEScript
                 FireControl.CustomData += "FireControl|TurretRequestTarget|" + Me.GetId() + "|+";
                 AimingLag = 0;
                 return;
-            }
-            Vector3D offset3D = new Vector3D(aimOffset.X / 180 * Math.PI, aimOffset.Y / 180 * Math.PI, aimOffset.Z / 180 * Math.PI);
-            Quaternion offset = new Quaternion((float)(Math.Cos(offset3D.Y * 0.5f) * Math.Sin(offset3D.X * 0.5f) * Math.Cos(offset3D.Z * 0.5f) + Math.Sin(offset3D.Y * 0.5f) * Math.Cos(offset3D.X * 0.5f) * Math.Sin(offset3D.Z * 0.5f)),
-                                                (float)(Math.Cos(offset3D.Y * 0.5f) * Math.Cos(offset3D.X * 0.5f) * Math.Sin(offset3D.Z * 0.5f) - Math.Sin(offset3D.Y * 0.5f) * Math.Sin(offset3D.X * 0.5f) * Math.Cos(offset3D.Z * 0.5f)),
-                                                (float)(Math.Sin(offset3D.Y * 0.5f) * Math.Cos(offset3D.X * 0.5f) * Math.Cos(offset3D.Z * 0.5f) - Math.Cos(offset3D.Y * 0.5f) * Math.Sin(offset3D.X * 0.5f) * Math.Sin(offset3D.Z * 0.5f)),
-                                                (float)(Math.Cos(offset3D.Y * 0.5f) * Math.Cos(offset3D.X * 0.5f) * Math.Cos(offset3D.Z * 0.5f) + Math.Sin(offset3D.Y * 0.5f) * Math.Sin(offset3D.X * 0.5f) * Math.Sin(offset3D.Z * 0.5f)));
+            }           
 
             MatrixD matrix = MatrixD.CreateLookAt(new Vector3D(), remote.WorldMatrix.Forward, remote.WorldMatrix.Up);
-            Vector3D posAngle = Vector3D.Normalize(Vector3D.TransformNormal(Vector3D.Transform(pos - remote.GetPosition(),offset), matrix));
+            Vector3D posAngle = Vector3D.Normalize(Vector3D.TransformNormal(Vector3D.Transform(pos - remote.GetPosition(),aimOffset), matrix));
             
             double distance = Vector3D.Distance(remote.GetPosition(), pos);
             //fireCD = distance > 1500 ? ((float)distance / 1000f) * 300f : 300f;
