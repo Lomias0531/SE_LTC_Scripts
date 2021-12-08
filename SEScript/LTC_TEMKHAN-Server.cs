@@ -8,7 +8,7 @@ namespace SEScript
 {
     class LTC_TEMKHAN_Server : API
     {
-        /*T.E.M.K.H.A.N.
+        /* T.E.M.K.H.A.N.
          * Tactical Extended Multi-Key Harmonized Antenna Network
          * 预期实现的功能：
          * ------------第一阶段---------------
@@ -19,20 +19,24 @@ namespace SEScript
          * ------------第二阶段---------------
          * 5、自动指定侦察机目标位置并发送至侦察机
          * 6、若武器系统未能检测到主机，则自动组建临时网络直至检测到主机为止
-         * 7、依据战场形势调整侦察机、战舰的位置和姿态
+         * 7、依据战场形势以集群算法调整侦察机、战舰的位置和姿态
+         * 8、增强抗干扰能力（跳频等）
          */
-        List<TargetStandard> targets;
-        List<MissileStandard> missiles;
+        List<long> activeTargetsIndex;
+        List<long> activeMissilesIndex;
+        Dictionary<long, TargetStandard> activeTargets;
+        Dictionary<long, MissileStandard> activeMissiles;
         bool CheckReady = false;
         IMyUnicastListener listener;
-        List<IMyBroadcastListener> broadcastListeners;
+        List<IMyBroadcastListener> channelListeners;
+        Random rnd;
         enum TargetType
         {
             HostileObject,
             FriendlyShip,
             LaunchedMissile,
             FriendlyScout,
-            FriendlyProbe,
+
         }
         Program()
         {
@@ -48,56 +52,232 @@ namespace SEScript
             CheckMissileStatus();
             CheckHostileStatus();
             ProcessBroadcastInfo();
+            AsyncInfo();
         }
         void CheckComponents()
         {
             InitSystem();
         }
+        /// <summary>
+        /// 系统初始化
+        /// </summary>
         void InitSystem()
         {
-            targets = new List<TargetStandard>();
-            missiles = new List<MissileStandard>();
+            activeTargetsIndex = new List<long>();
+            activeTargets = new Dictionary<long, TargetStandard>();
+            activeMissilesIndex = new List<long>();
+            activeMissiles = new Dictionary<long, MissileStandard>();
             Runtime.UpdateFrequency = UpdateFrequency.Update1;
             listener = IGC.UnicastListener;
-            broadcastListeners = new List<IMyBroadcastListener>();
-            IMyBroadcastListener MissileChannelListener = IGC.RegisterBroadcastListener("MissilesChannel");
-            broadcastListeners.Add(MissileChannelListener);
+            channelListeners = new List<IMyBroadcastListener>();
+            //为导弹分配10个频道，每次向导弹发送消息以及导弹发送消息均采用随机3个频道以避免信息丢失
+            for(int i = 0;i<10;i++)
+            {
+                IMyBroadcastListener channel = IGC.RegisterBroadcastListener("MissilesChannel" + i.ToString());
+                channelListeners.Add(channel);
+            }
+            //为敌方信息分配10个频道，每次更新敌方信息均采用3个随机频道以避免信息丢失
+            for (int i = 0; i < 10; i++)
+            {
+                IMyBroadcastListener channel = IGC.RegisterBroadcastListener("HostileInfoChannel" + i.ToString());
+                channelListeners.Add(channel);
+            }
+            rnd = new Random((int)Me.EntityId);
         }
+        /// <summary>
+        /// 检查所有导弹状态
+        /// </summary>
         void CheckMissileStatus()
         {
-            for (int i = 0; i < missiles.Count; i++)
+            for (int i = 0; i < activeMissilesIndex.Count; i++)
             {
-                missiles[i].TatgetScanLife -= 1;
-                if (missiles[i].TatgetScanLife == 0)
+                activeMissiles[activeMissilesIndex[i]].TargetScanLife -= 1;
+                if(activeMissiles[activeMissilesIndex[i]].TargetScanLife == 20)
                 {
-                    missiles.RemoveAt(i);
+                    for (int d = 0; d < 3; d++)
+                    {
+                        int index = rnd.Next(0, 10);
+                        IGC.SendUnicastMessage(activeMissiles[activeMissilesIndex[i]].TargetID, "MissilesChannel" + index.ToString(), "Missile|Check_Status|");
+                    }
+                }
+                if (activeMissiles[activeMissilesIndex[i]].TargetScanLife == 0)
+                {
+                    activeMissiles.Remove(activeMissilesIndex[i]);
+                    activeMissilesIndex.RemoveAt(i);
                     i -= 1;
                     continue;
                 }
-                IGC.SendUnicastMessage(missiles[i].TargetID, "MissilesChannel", "Missile|Check_Status|");
             }
         }
+        /// <summary>
+        /// 检查所有敌方目标状态
+        /// </summary>
         void CheckHostileStatus()
         {
-            for (int i = 0; i < targets.Count; i++)
+            for (int i = 0; i < activeTargetsIndex.Count; i++)
             {
-                targets[i].TatgetScanLife -= 1;
-                if (targets[i].TatgetScanLife == 0)
+                activeTargets[activeTargetsIndex[i]].TargetScanLife -= 1;
+                if (activeTargets[activeTargetsIndex[i]].TargetScanLife == 0)
                 {
-                    targets.RemoveAt(i);
+                    activeTargets.Remove(activeTargetsIndex[i]);
+                    activeMissilesIndex.RemoveAt(i);
                     i -= 1;
                 }
             }
         }
+        /// <summary>
+        /// 处理接收到的消息
+        /// </summary>
         void ProcessBroadcastInfo()
         {
+            for(int i = 0;i<channelListeners.Count;i++)
+            {
+                if(channelListeners[i].HasPendingMessage)
+                {
+                    MyIGCMessage message = channelListeners[i].AcceptMessage();
+                    string[] data = message.Data.ToString().Split('|');
+                    if (message.Tag.Contains("MissilesChannel"))
+                    {
+                        if(data[0] == "Missile")
+                        {
+                            switch(data[1])
+                            {
+                                default:
+                                    {
+                                        break;
+                                    }
+                                case "ConfirmStatus"://导弹回复状态确认消息，刷新导弹确认时间
+                                    {
+                                        if(activeMissiles.ContainsKey(message.Source))
+                                        {
+                                            activeMissiles[message.Source].TargetScanLife = 60;
+                                        }
+                                        break;
+                                    }
+                                case "FinalFarewell"://导弹发送引爆消息，从导弹列表中移除
+                                    {
+                                        if(activeMissiles.ContainsKey(message.Source))
+                                        {
+                                            activeMissiles.Remove(message.Source);
+                                        }
+                                        if(activeMissilesIndex.Contains(message.Source))
+                                        {
+                                            activeMissilesIndex.Remove(message.Source);
+                                        }
+                                        break;
+                                    }
+                                case "LaunchConfirmed"://导弹发送发射消息，检查列表中是否有相同ID的导弹，并新增项目
+                                    {
+                                        if (activeMissiles.ContainsKey(message.Source))
+                                        {
+                                            activeMissiles.Remove(message.Source);
+                                        }
+                                        if (activeMissilesIndex.Contains(message.Source))
+                                        {
+                                            activeMissilesIndex.Remove(message.Source);
+                                        }
+                                        MissileStandard missile = new MissileStandard();
+                                        missile.TargetID = message.Source;
+                                        missile.TargetScanLife = 60;
+                                        missile.AsyncTime = 10;
+                                        missile.LockedTarget = long.Parse(data[2]);
+                                        activeMissiles.Add(message.Source, missile);
+                                        activeMissilesIndex.Add(message.Source);
+                                        break;
+                                    }
+                            }
+                        }
+                    }else if(message.Tag.Contains("HostileInfoChannel"))
+                    {
+                        if(data[0] == "HostileTarget")
+                        {
+                            switch(data[1])
+                            {
+                                default:
+                                    {
+                                        break;
+                                    }
+                                case "UpdateTargetInfo":
+                                    {
+                                        long targetID = long.Parse(data[2]);
+                                        if (!activeTargetsIndex.Contains(targetID))
+                                        {
+                                            activeTargetsIndex.Add(targetID);
+                                        }
+                                        if(!activeTargets.ContainsKey(targetID))
+                                        {
+                                            TargetStandard target = new TargetStandard();
+                                            target.TargetID = targetID;
+                                            target.TargetScanLife = 40;
+                                            Vector3D.TryParse(data[3],out target.TargetPos);
+                                            Vector3D.TryParse(data[4], out target.TargetVel);
+                                            target.TargetRot = new QuaternionD(float.Parse(data[5]), float.Parse(data[6]), float.Parse(data[7]), float.Parse(data[8]));
+                                            activeTargets.Add(targetID, target);
+                                        }else
+                                        {
+                                            activeTargets[message.Source].TargetScanLife = 40;
+                                            Vector3D.TryParse(data[3], out activeTargets[message.Source].TargetPos);
+                                            Vector3D.TryParse(data[4], out activeTargets[message.Source].TargetVel);
+                                            activeTargets[message.Source].TargetRot = new QuaternionD(float.Parse(data[5]), float.Parse(data[6]), float.Parse(data[7]), float.Parse(data[8]));
+                                        }
+                                        break;
+                                    }
+                            }
+                        }
+                    }else if(message.Tag.Contains("FriendlyScoutChannel"))
+                    {
+                        return;
+                    }else if(message.Tag.Contains("FriendlyShipChannel"))
+                    {
+                        return;
+                    }
+                }
+            }
+        }
+        /// <summary>
+        /// 向导弹或友方舰船同步消息
+        /// </summary>
+        void AsyncInfo()
+        {
+            for(int i = 0;i<activeMissilesIndex.Count;i++)
+            {
+                activeMissiles[activeMissilesIndex[i]].AsyncTime -= 1;
 
+                if (activeMissiles[activeMissilesIndex[i]].AsyncTime == 0)
+                {
+                    string targetInfo;
+                    if (activeTargets.ContainsKey(activeMissiles[activeMissilesIndex[i]].LockedTarget))
+                    {
+                        targetInfo = activeTargets[activeMissiles[activeMissilesIndex[i]].LockedTarget].TargetPos.ToString() + "|" + activeTargets[activeMissiles[activeMissilesIndex[i]].LockedTarget].TargetVel.ToString() + "|";
+                        targetInfo += activeTargets[activeMissiles[activeMissilesIndex[i]].LockedTarget].TargetRot.X.ToString() + "|" + activeTargets[activeMissiles[activeMissilesIndex[i]].LockedTarget].TargetRot.Y.ToString() + "|" 
+                                    + activeTargets[activeMissiles[activeMissilesIndex[i]].LockedTarget].TargetRot.Z.ToString() + "|" + activeTargets[activeMissiles[activeMissilesIndex[i]].LockedTarget].TargetRot.W.ToString();
+                        for (int d = 0; d < 3; d++)
+                        {
+                            int index = rnd.Next(0, 10);
+                            IGC.SendUnicastMessage(activeMissilesIndex[i], "MissilesChannel" + index.ToString(), "Missile|AsyncTargetInfo|" + targetInfo);
+                        }
+                    }
+                    else
+                    {
+                        for (int d = 0; d < 3; d++)
+                        {
+                            int index = rnd.Next(0, 10);
+                            IGC.SendUnicastMessage(activeMissilesIndex[i], "MissilesChannel" + index.ToString(), "Missile|SelfDestruct|");
+                        }
+                        activeMissiles.Remove(activeMissilesIndex[i]);
+                        activeMissilesIndex.RemoveAt(i);
+                        i--;
+                    }
+                }
+
+                activeMissiles[activeMissilesIndex[i]].AsyncTime = 10;
+            }
         }
 
         class TargetStandard
         {
             public long TargetID;
-            public int TatgetScanLife;
+            public int TargetScanLife;
             public Vector3D TargetPos;
             public Vector3D TargetVel;
             public QuaternionD TargetRot;
@@ -105,6 +285,7 @@ namespace SEScript
         class MissileStandard : TargetStandard
         {
             public long LockedTarget;
+            public int AsyncTime;
         }
 
         #region
