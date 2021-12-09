@@ -197,29 +197,28 @@ namespace SEScript
                                     {
                                         break;
                                     }
-                                case "UpdateTargetInfo":
+                                case "UpdateTargetInfo"://接收来自友方舰船发来的敌方消息
                                     {
-                                        long targetID = long.Parse(data[2]);
-                                        if (!activeTargetsIndex.Contains(targetID))
+                                        string[] targets = data[2].Split(',');
+                                        for(int t = 0;t<targets.Length;t++)
                                         {
-                                            activeTargetsIndex.Add(targetID);
-                                        }
-                                        if(!activeTargets.ContainsKey(targetID))
-                                        {
-                                            TargetStandard target = new TargetStandard();
-                                            target.TargetID = targetID;
-                                            target.TargetScanLife = 40;
-                                            Vector3D.TryParse(data[3],out target.TargetPos);
-                                            Vector3D.TryParse(data[4], out target.TargetVel);
-                                            target.TargetRot = new QuaternionD(float.Parse(data[5]), float.Parse(data[6]), float.Parse(data[7]), float.Parse(data[8]));
-                                            activeTargets.Add(targetID, target);
-                                        }else
-                                        {
-                                            activeTargets[message.Source].TargetScanLife = 40;
-                                            Vector3D.TryParse(data[3], out activeTargets[message.Source].TargetPos);
-                                            Vector3D.TryParse(data[4], out activeTargets[message.Source].TargetVel);
-                                            activeTargets[message.Source].TargetRot = new QuaternionD(float.Parse(data[5]), float.Parse(data[6]), float.Parse(data[7]), float.Parse(data[8]));
-                                        }
+                                            string[] info = targets[t].Split('|');
+                                            long targetID = long.Parse(info[0]);
+                                            if (!activeTargetsIndex.Contains(targetID))
+                                            {
+                                                activeTargetsIndex.Add(targetID);
+                                            }
+                                            if (!activeTargets.ContainsKey(targetID))
+                                            {
+                                                TargetStandard target = new TargetStandard();
+                                                target.TargetID = targetID;
+                                                activeTargets.Add(targetID, target);
+                                            }
+                                            activeTargets[targetID].TargetScanLife = 40;
+                                            Vector3D.TryParse(info[1], out activeTargets[targetID].TargetPos);
+                                            Vector3D.TryParse(info[2], out activeTargets[targetID].TargetVel);
+                                            //activeTargets[targetID].TargetRot = new QuaternionD(float.Parse(info[3]), float.Parse(info[4]), float.Parse(info[5]), float.Parse(info[6]));
+                                        }                                       
                                         break;
                                     }
                             }
@@ -246,27 +245,20 @@ namespace SEScript
                 if (activeMissiles[activeMissilesIndex[i]].AsyncTime == 0)
                 {
                     string targetInfo;
-                    if (activeTargets.ContainsKey(activeMissiles[activeMissilesIndex[i]].LockedTarget))
+
+                    if (!activeTargets.ContainsKey(activeMissiles[activeMissilesIndex[i]].LockedTarget))
                     {
-                        targetInfo = activeTargets[activeMissiles[activeMissilesIndex[i]].LockedTarget].TargetPos.ToString() + "|" + activeTargets[activeMissiles[activeMissilesIndex[i]].LockedTarget].TargetVel.ToString() + "|";
-                        targetInfo += activeTargets[activeMissiles[activeMissilesIndex[i]].LockedTarget].TargetRot.X.ToString() + "|" + activeTargets[activeMissiles[activeMissilesIndex[i]].LockedTarget].TargetRot.Y.ToString() + "|" 
-                                    + activeTargets[activeMissiles[activeMissilesIndex[i]].LockedTarget].TargetRot.Z.ToString() + "|" + activeTargets[activeMissiles[activeMissilesIndex[i]].LockedTarget].TargetRot.W.ToString();
-                        for (int d = 0; d < 3; d++)
-                        {
-                            int index = rnd.Next(0, 10);
-                            IGC.SendUnicastMessage(activeMissilesIndex[i], "MissilesChannel" + index.ToString(), "Missile|AsyncTargetInfo|" + targetInfo);
-                        }
+                        int targetIndex = rnd.Next(0, activeTargetsIndex.Count);
+                        activeMissiles[activeMissilesIndex[i]].LockedTarget = activeMissilesIndex[targetIndex];
                     }
-                    else
+
+                    targetInfo = activeTargets[activeMissiles[activeMissilesIndex[i]].LockedTarget].TargetPos.ToString() + "|" + activeTargets[activeMissiles[activeMissilesIndex[i]].LockedTarget].TargetVel.ToString() + "|";
+                    //targetInfo += activeTargets[activeMissiles[activeMissilesIndex[i]].LockedTarget].TargetRot.X.ToString() + "|" + activeTargets[activeMissiles[activeMissilesIndex[i]].LockedTarget].TargetRot.Y.ToString() + "|"
+                                //+ activeTargets[activeMissiles[activeMissilesIndex[i]].LockedTarget].TargetRot.Z.ToString() + "|" + activeTargets[activeMissiles[activeMissilesIndex[i]].LockedTarget].TargetRot.W.ToString();
+                    for (int d = 0; d < 3; d++)
                     {
-                        for (int d = 0; d < 3; d++)
-                        {
-                            int index = rnd.Next(0, 10);
-                            IGC.SendUnicastMessage(activeMissilesIndex[i], "MissilesChannel" + index.ToString(), "Missile|SelfDestruct|");
-                        }
-                        activeMissiles.Remove(activeMissilesIndex[i]);
-                        activeMissilesIndex.RemoveAt(i);
-                        i--;
+                        int index = rnd.Next(0, 10);
+                        IGC.SendUnicastMessage(activeMissilesIndex[i], "MissilesChannel" + index.ToString(), "Missile|AsyncTargetInfo|" + targetInfo);
                     }
                 }
 
@@ -280,7 +272,7 @@ namespace SEScript
             public int TargetScanLife;
             public Vector3D TargetPos;
             public Vector3D TargetVel;
-            public QuaternionD TargetRot;
+            //public QuaternionD TargetRot;
         }
         class MissileStandard : TargetStandard
         {
