@@ -180,7 +180,8 @@ namespace SEScript
                                         missile.TargetID = message.Source;
                                         missile.TargetScanLife = 60;
                                         missile.AsyncTime = 10;
-                                        missile.LockedTarget = long.Parse(data[2]);
+                                        int targetIndex = rnd.Next(0, activeTargetsIndex.Count);
+                                        missile.LockedTarget = activeTargetsIndex[targetIndex];
                                         activeMissiles.Add(message.Source, missile);
                                         activeMissilesIndex.Add(message.Source);
                                         break;
