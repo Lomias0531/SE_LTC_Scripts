@@ -16,13 +16,14 @@ namespace SEScript
         List<IMyGyro> Gyros;
         List<IMyShipMergeBlock> Merge;
         List<IMyThrust> Thrusts;
+        IMyTimerBlock spark;
         bool CheckReady = false;
 
         //float MissileMass = 1328;
         float MissileMass = 1328;
         bool launched = false;
         Vector3D TargetPos;
-        Vector3D TargetVel;
+        //Vector3D TargetVel;
         float TimeStamp = 0;
         int BreakThroughCount = 0;
         Vector3D BreakThroughOffset;
@@ -33,6 +34,8 @@ namespace SEScript
         Vector3D TargetPosPev;
         int GuideCount = 100;
         int EvadeDistance = 800;
+
+        IMyUnicastListener unicastListener;
         void Main(string arg)
         {
             Echo(TimeStamp.ToString());
@@ -46,7 +49,7 @@ namespace SEScript
             if(launched)
             {
                 Echo("TARGET LOCKED");
-                ScanTarget();
+                //ScanTarget();
                 TrackTarget();
             }else
             {
@@ -106,59 +109,13 @@ namespace SEScript
                 Echo("Thrust");
                 return;
             }
+            spark = (IMyTimerBlock)GridTerminalSystem.GetBlockWithName("TriggerSpark");
 
+            unicastListener = IGC.UnicastListener;
             CheckReady = true;
             return;
         }
-        void ScanTarget()
-        {
-            //持续追踪目标
-            bool targetAcquired = false;
-            foreach (var cam in Scanners)
-            {
-                if(!cam.CanScan(TargetPos))
-                {
-                    continue;
-                }
-                MyDetectedEntityInfo target = cam.Raycast(TargetPos);
-                if (!target.IsEmpty())
-                {
-                    if(target.Relationship == VRage.Game.MyRelationsBetweenPlayerAndBlock.Enemies)
-                    {
-                        Echo("Target locking");
-                        TargetPos = (Vector3D)target.HitPosition;
-                        TargetVel = target.Velocity;
-                        targetAcquired = true;
-                    }
-                }
-                break;
-            }
-            //若目标丢失则随机取1个采样点进行探测
-            if(!targetAcquired)
-            {
-                foreach (var cam in Scanners)
-                {
-                    if(!cam.CanScan(2000))
-                    {
-                        continue;
-                    }
-                    Random rnd = new Random();
-                    float offsetX = rnd.Next(-45000, 45000) / 1000;
-                    float offsetY = rnd.Next(-45000, 45000) / 1000;
-                    MyDetectedEntityInfo target = cam.Raycast(2000, offsetX, offsetY);
-                    if (!target.IsEmpty())
-                    {
-                        if (target.Relationship == VRage.Game.MyRelationsBetweenPlayerAndBlock.Enemies)
-                        {
-                            Echo("Target acquired");
-                            TargetPos = (Vector3D)target.HitPosition;
-                            TargetVel = target.Velocity;
-                            targetAcquired = true;
-                        }
-                    }
-                }
-            }
-        }
+        
         void TrackTarget()
         {
             if(Vector3D.Distance(TargetPos, Gyros[0].CubeGrid.GetPosition()) < 5f)
@@ -167,11 +124,24 @@ namespace SEScript
                 {
                     item.Detonate();
                 }
+                for (int i = 0; i < 3; i++)
+                {
+                    int index = rnd.Next(0, 10);
+                    IGC.SendBroadcastMessage("MissilesChannel" + index.ToString(), "Missile|FinalFarewell", TransmissionDistance.TransmissionDistanceMax);
+                }
             }
 
             if(TimeStamp < GuideCount)
             {
                 return;
+            }
+            if(TimeStamp == GuideCount)
+            {
+                for (int i = 0; i < 3; i++)
+                {
+                    int index = rnd.Next(0, 10);
+                    IGC.SendBroadcastMessage("MissilesChannel" + index.ToString(), "Missile|LaunchConfirmed", TransmissionDistance.TransmissionDistanceMax);
+                }
             }
 
             //计算可提供的最大加速度
@@ -384,9 +354,61 @@ namespace SEScript
             }
             TimeStamp = 0;
             GuideCount = rnd.Next(0, 10) * 10 + 100;
+            if (spark != null)
+                spark.Trigger();
         }
         void ExecuteCmd(string msg)
         {
+            if (unicastListener.HasPendingMessage)
+            {
+                //if (TimeStamp < GuideCount) return;
+                MyIGCMessage message = unicastListener.AcceptMessage();
+                if (message.Tag.Contains("MissilesChannel"))
+                {
+                    string[] data = message.Data.ToString().Split('|');
+                    if (data[0] == "Missile")
+                    {
+                        switch (data[1])
+                        {
+                            case "AsyncTargetInfo":
+                                {
+                                    Vector3D pos = new Vector3D();
+                                    Vector3D.TryParse(data[2], out pos);
+                                    if (pos != null)
+                                        TargetPos = pos;
+                                    for (int i = 0; i < 3; i++)
+                                    {
+                                        int index = rnd.Next(0, 10);
+                                        IGC.SendBroadcastMessage("MissilesChannel" + index.ToString(), "Missile|ConfirmStatus", TransmissionDistance.TransmissionDistanceMax);
+                                    }
+                                    break;
+                                }
+                            case "SelfDestruct":
+                                {
+                                    for (int i = 0; i < 3; i++)
+                                    {
+                                        int index = rnd.Next(0, 10);
+                                        IGC.SendBroadcastMessage("MissilesChannel" + index.ToString(), "Missile|FinalFarewell", TransmissionDistance.TransmissionDistanceMax);
+                                    }
+                                    foreach (var item in WarHeads)
+                                    {
+                                        item.Detonate();
+                                    }
+                                    break;
+                                }
+                            case "StatusIdle":
+                                {
+                                    for (int i = 0; i < 3; i++)
+                                    {
+                                        int index = rnd.Next(0, 10);
+                                        IGC.SendBroadcastMessage("MissilesChannel" + index.ToString(), "Missile|ConfirmStatus", TransmissionDistance.TransmissionDistanceMax);
+                                    }
+                                    break;
+                                }
+                        }
+                    }
+                }
+            }
             string cmd = string.IsNullOrEmpty(msg) ? Me.CustomData : msg;
             string[] cmds = cmd.Split('|');
             if (cmds[0] != "Missile") return;
@@ -402,7 +424,7 @@ namespace SEScript
                     }
             }
             if(string.IsNullOrEmpty(msg))
-                Me.CustomData = "";
+                Me.CustomData = "";           
         }
     }
 }
