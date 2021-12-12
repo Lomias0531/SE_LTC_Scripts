@@ -35,6 +35,7 @@ namespace SEScript
         List<string> DisplayMessage;
         IMyTextPanel MessageBoard;
         CurrentStatus curStatus = CurrentStatus.Offline;
+        List<long> itemRemoval;
         enum TargetType
         {
             HostileObject,
@@ -50,7 +51,7 @@ namespace SEScript
         }
         Program()
         {
-            Runtime.UpdateFrequency = UpdateFrequency.Update1;
+            Runtime.UpdateFrequency = UpdateFrequency.Update10;
         }
         void Main()
         {
@@ -87,7 +88,7 @@ namespace SEScript
             activeMissiles = new Dictionary<long, MissileStandard>();
             activeFriendlyIndex = new List<long>();
             activeFriendly = new Dictionary<long, TargetStandard>();
-            Runtime.UpdateFrequency = UpdateFrequency.Update1;
+            Runtime.UpdateFrequency = UpdateFrequency.Update10;
             listener = IGC.UnicastListener;
             channelListeners = new List<IMyBroadcastListener>();
             //为导弹分配10个频道，每次向导弹发送消息以及导弹发送消息均采用随机3个频道以避免信息丢失
@@ -114,6 +115,7 @@ namespace SEScript
             }
             rnd = new Random((int)Me.EntityId);
             DisplayMessage = new List<string>();
+            itemRemoval = new List<long>();
             ShowMessage("System online");
             CheckReady = true;
         }
@@ -122,14 +124,14 @@ namespace SEScript
         /// </summary>
         void CheckMissileStatus()
         {
-            List<long> removal = new List<long>();
+            itemRemoval.Clear();
             for (int i = 0; i < activeMissilesIndex.Count; i++)
             {
                 activeMissiles[activeMissilesIndex[i]].TargetScanLife -= 1;
 
                 if (activeMissiles[activeMissilesIndex[i]].TargetScanLife <= 0)
                 {
-                    removal.Add(activeMissilesIndex[i]);
+                    itemRemoval.Add(activeMissilesIndex[i]);
                     if (i > 0)
                         i -= 1;
                     else
@@ -137,13 +139,13 @@ namespace SEScript
                         continue;
                 }
             }
-            if(removal.Count>0)
+            if(itemRemoval.Count>0)
             {
-                foreach (var item in removal)
+                for(int i = 0;i< itemRemoval.Count;i++)
                 {
-                    activeMissiles.Remove(item);
-                    activeMissilesIndex.Remove(item);
-                    ShowMessage("导弹" + item.ToString() + "已销毁");
+                    activeMissiles.Remove(itemRemoval[i]);
+                    activeMissilesIndex.Remove(itemRemoval[i]);
+                    ShowMessage("导弹" + itemRemoval[i].ToString() + "已销毁");
                 }
             }
         }
@@ -152,35 +154,35 @@ namespace SEScript
         /// </summary>
         void CheckHostileStatus()
         {
-            List<long> removal = new List<long>();
+            itemRemoval.Clear();
             for (int i = 0; i <activeTargetsIndex.Count; i++)
             {
                 activeTargets[activeTargetsIndex[i]].TargetScanLife -= 1;
                 if (activeTargets[activeTargetsIndex[i]].TargetScanLife <= 0)
                 {
-                    removal.Add(activeTargetsIndex[i]);
+                    itemRemoval.Add(activeTargetsIndex[i]);
                     i += 1;
                 }
             }
-            if(removal.Count>0)
+            if(itemRemoval.Count>0)
             {
-                foreach (var item in removal)
+                for(int i = 0;i<itemRemoval.Count;i++)
                 {
-                    activeTargets.Remove(item);
-                    activeTargetsIndex.Remove(item);
-                    ShowMessage("敌方目标" + item.ToString() + "已摧毁");
+                    activeTargets.Remove(itemRemoval[i]);
+                    activeTargetsIndex.Remove(itemRemoval[i]);
+                    ShowMessage("敌方目标" + itemRemoval[i].ToString() + "已摧毁");
                 }
             }
         }
         void CheckFriendlyStatus()
         {
-            List<long> removal = new List<long>();
+            itemRemoval.Clear();
             for(int i = 0;i<activeFriendlyIndex.Count;i++)
             {
                 activeFriendly[activeFriendlyIndex[i]].AsyncTime -= 1;
                 if(activeFriendly[activeFriendlyIndex[i]].AsyncTime <= 0)
                 {
-                    removal.Add(activeFriendlyIndex[i]);
+                    itemRemoval.Add(activeFriendlyIndex[i]);
                     if (i > 0)
                         i--;
                     else
@@ -188,13 +190,13 @@ namespace SEScript
                         continue;
                 }
             }
-            if(removal.Count>0)
+            if(itemRemoval.Count>0)
             {
-                foreach (var item in removal)
+                for(int i = 0;i<itemRemoval.Count;i++)
                 {
-                    activeFriendlyIndex.Remove(item);
-                    activeTargets.Remove(item);
-                    ShowMessage("己方单位" + item.ToString() + "已失联");
+                    activeFriendlyIndex.Remove(itemRemoval[i]);
+                    activeTargets.Remove(itemRemoval[i]);
+                    ShowMessage("己方单位" + itemRemoval[i].ToString() + "已失联");
                 }
             }
         }
@@ -224,7 +226,7 @@ namespace SEScript
                                     {
                                         if(activeMissiles.ContainsKey(message.Source))
                                         {
-                                            activeMissiles[message.Source].TargetScanLife = 120;
+                                            activeMissiles[message.Source].TargetScanLife = 12;
                                             ShowMessage("导弹" + message.Source.ToString() + "确认状态");
                                         }
                                         break;
@@ -254,8 +256,8 @@ namespace SEScript
                                         }
                                         MissileStandard missile = new MissileStandard();
                                         missile.TargetID = message.Source;
-                                        missile.TargetScanLife = 120;
-                                        missile.AsyncTime = 10;
+                                        missile.TargetScanLife = 12;
+                                        missile.AsyncTime = 3;
                                         missile.type = TargetType.LaunchedMissile;
                                         int targetIndex = rnd.Next(0, activeTargetsIndex.Count);
                                         missile.LockedTarget = activeTargetsIndex[targetIndex];
@@ -298,7 +300,7 @@ namespace SEScript
                                                 target.TargetID = targetID;
                                                 activeTargets.Add(targetID, target);
                                             }
-                                            activeTargets[targetID].TargetScanLife = 120;
+                                            activeTargets[targetID].TargetScanLife = 12;
                                             Vector3D.TryParse(info[1], out activeTargets[targetID].TargetPos);
                                             Vector3D.TryParse(info[2], out activeTargets[targetID].TargetVel);
                                             //activeTargets[targetID].TargetRot = new QuaternionD(float.Parse(info[3]), float.Parse(info[4]), float.Parse(info[5]), float.Parse(info[6]));
@@ -325,7 +327,7 @@ namespace SEScript
                                             TargetStandard target = new TargetStandard();
                                             target.type = TargetType.FriendlyScout;
                                             target.TargetID = message.Source;
-                                            target.AsyncTime = 120;
+                                            target.AsyncTime = 12;
                                             activeFriendly.Add(message.Source, target);
                                         }
                                         IGC.SendUnicastMessage(message.Source, "FriendlyScoutChannel", "ConfirmedRegister");
@@ -348,7 +350,7 @@ namespace SEScript
                                                 TargetStandard target = new TargetStandard();
                                                 target.type = TargetType.FriendlyScout;
                                                 target.TargetID = message.Source;
-                                                target.AsyncTime = 120;
+                                                target.AsyncTime = 12;
                                                 activeFriendly.Add(message.Source, target);
                                             }
                                             ShowMessage("友方侦察机" + message.Source.ToString() + "已连接");
@@ -378,7 +380,7 @@ namespace SEScript
                                             TargetStandard target = new TargetStandard();
                                             target.type = TargetType.FriendlyShip;
                                             target.TargetID = message.Source;
-                                            target.AsyncTime = 60;
+                                            target.AsyncTime = 6;
                                             activeFriendly.Add(message.Source, target);
                                         }
                                         ShowMessage("友方舰船" + message.Source.ToString() + "已连接");
@@ -438,7 +440,7 @@ namespace SEScript
                             IGC.SendUnicastMessage(activeMissilesIndex[i], "MissilesChannel" + index.ToString(), "Missile|AsyncTargetInfo|" + targetInfo);
                         }
                     }
-                    activeMissiles[activeMissilesIndex[i]].AsyncTime = 30;
+                    activeMissiles[activeMissilesIndex[i]].AsyncTime = 3;
                 }
             }
         }

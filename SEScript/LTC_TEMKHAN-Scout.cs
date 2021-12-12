@@ -21,7 +21,7 @@ namespace SEScript
         IMyUnicastListener unicastChannel;
         Program()
         {
-            Runtime.UpdateFrequency = UpdateFrequency.Update1;
+            Runtime.UpdateFrequency = UpdateFrequency.Update10;
         }
 
         void Main()
@@ -32,14 +32,14 @@ namespace SEScript
                 return;
             }
             selfCheckTime += 1;
-            if(selfCheckTime > 120)
+            if(selfCheckTime > 12)
             {
                 CheckComponents();
                 selfCheckTime = 0;
             }
             asyncTime += 1;
             ProcessMessages();
-            if (asyncTime > 60)
+            if (asyncTime > 6)
             {
                 if(ServerAddress != 0)
                 {
@@ -121,7 +121,7 @@ namespace SEScript
             if(detectedTargets.Count > 0)
             {
                 asyncTargetTime += 1;
-                if(asyncTargetTime >= 60)
+                if(asyncTargetTime >= 6)
                 {
                     string targetInfo = "";
                     for (int i = 0; i < detectedTargets.Count; i++)
@@ -140,7 +140,7 @@ namespace SEScript
             }
             else
             {
-                asyncTargetTime = 60;
+                asyncTargetTime = 6;
             }
         }
         void ProcessMessages()
