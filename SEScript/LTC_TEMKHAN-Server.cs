@@ -33,7 +33,7 @@ namespace SEScript
         List<IMyBroadcastListener> channelListeners;
         Random rnd;
         List<string> DisplayMessage;
-        IMyTextPanel MessageBoard;
+        IMyTextSurface MessageBoard;
         CurrentStatus curStatus = CurrentStatus.Offline;
         List<long> itemRemoval;
         enum TargetType
@@ -53,18 +53,25 @@ namespace SEScript
         {
             Runtime.UpdateFrequency = UpdateFrequency.Update10;
         }
-        void Main()
+        void Main(string arg,UpdateType updateType)
         {
             if (!CheckReady)
             {
                 CheckComponents();
                 return;
             }
-            CheckMissileStatus();
-            CheckHostileStatus();
-            CheckFriendlyStatus();
-            ProcessBroadcastInfo();
-            AsyncInfo();
+            switch(updateType)
+            {
+                case UpdateType.Update10 | UpdateType.Update1:
+                    CheckMissileStatus();
+                    CheckHostileStatus();
+                    CheckFriendlyStatus();
+                    break;
+                case UpdateType.IGC:
+                    ProcessBroadcastInfo();
+                    AsyncInfo();
+                    break;
+            }
         }
         void CheckComponents()
         {
@@ -74,7 +81,7 @@ namespace SEScript
             {
                 curStatus = CurrentStatus.Online;
             }
-            MessageBoard = (IMyTextPanel)GridTerminalSystem.GetBlockWithName("ServerDisplay");
+            MessageBoard = ((IMyProgrammableBlock)Me).GetSurface(0);
             InitSystem();
         }
         /// <summary>
@@ -465,6 +472,59 @@ namespace SEScript
                 MessageBoard.WriteText(info);
             }
         }
+        class CommandProcessor
+        {
+            Queue<LTCCommand> queuedFixedActions;
+            Queue<LTCCommand> queuedTempActions;
+            float timeElapsed = 0;
+            readonly float elapseTimeMax;
+            public void InitProcessor()
+            {
+                queuedTempActions = new Queue<LTCCommand>();
+                queuedFixedActions = new Queue<LTCCommand>();
+            }
+            public void Update()
+            {
+                timeElapsed = 0;
+                foreach (var command in queuedFixedActions)
+                {
+                    command.ExeCommand();
+                }
+                foreach (var command in queuedTempActions)
+                {
+                    if (Runtime.LastRunTimeMs > (1f / 60f))
+                    {
+                        break;
+                    }
+                    command.ExeCommand();
+                    queuedTempActions.Dequeue();
+                }
+            }
+            public void QueueTempAction(Action action)
+            {
+                LTCCommand cmd = new LTCCommand(action,true);
+                queuedTempActions.Enqueue(cmd);
+            }
+            public void QueueTimedAction(Action action)
+            {
+                LTCCommand cmd = new LTCCommand(action, false);
+                queuedFixedActions.Enqueue(cmd);
+            }
+        }
+        class LTCCommand
+        {
+            public Action action;
+            public bool isTemp = true;
+            public LTCCommand(Action _action,bool _isTemp)
+            {
+                action = _action;
+                isTemp = _isTemp;
+            }
+            public void ExeCommand()
+            {
+                action.Invoke();
+            }
+        }
         class TargetStandard
         {
             public long TargetID;
@@ -478,72 +538,6 @@ namespace SEScript
         class MissileStandard : TargetStandard
         {
             public long LockedTarget;
-        }
-
-        #region
-        //--------------------------------------------------------------------------------------------------------------------------
-
-        //bool CheckComponents = false;
-        //IMyTextSurface textDisplay;
-        //List<string> txtDisplay = new List<string>();
-        //List<IMyBroadcastListener> listeners = new List<IMyBroadcastListener>();
-        //IMyUnicastListener uniCaster;
-
-        //Program()
-        //{
-        //    Runtime.UpdateFrequency = UpdateFrequency.Update1;
-        //}
-
-        //void Main(string arg, UpdateType updateType)
-        //{
-        //    if(!CheckComponents)
-        //    {
-        //        CheckComponent();
-        //        return;
-        //    }
-        //    foreach (var channel in listeners)
-        //    {
-        //        if(channel.HasPendingMessage)
-        //        {
-        //            MyIGCMessage message = channel.AcceptMessage();
-        //            DisplayInfo(message.Source + ":" + message.Tag + "/" + message.Data.ToString());
-        //        }
-        //    }
-        //    IGC.SendBroadcastMessage("Channel1", "Hello!",TransmissionDistance.TransmissionDistanceMax);
-        //    IGC.SendBroadcastMessage("Channel2", "World!", TransmissionDistance.TransmissionDistanceMax);
-        //}
-        //void CheckComponent()
-        //{
-        //    textDisplay = (IMyTextSurface)GridTerminalSystem.GetBlockWithName("Display");
-        //    if(txtDisplay == null)
-        //    {
-        //        Echo("LCD not found");
-        //        return;
-        //    }
-        //    CheckComponents = true;
-        //    IMyBroadcastListener Channel1 = IGC.RegisterBroadcastListener("Channel1");
-        //    Echo("Registered Channel 1");
-        //    IMyBroadcastListener Channel2 = IGC.RegisterBroadcastListener("Channel2");
-        //    Echo("Registered Channel 2");
-        //    listeners.Add(Channel1);
-        //    listeners.Add(Channel2);
-        //    uniCaster = IGC.UnicastListener;
-        //}
-        //void DisplayInfo(string data)
-        //{
-        //    if(txtDisplay.Count>10)
-        //    {
-        //        txtDisplay.RemoveAt(0);
-        //    }
-        //    txtDisplay.Add(data);
-
-        //    string info = "";
-        //    foreach (var item in txtDisplay)
-        //    {
-        //        info += item + "\r\n";
-        //    }
-        //    textDisplay.WriteText(info);
-        //}
-        #endregion
+        }       
     }
 }
