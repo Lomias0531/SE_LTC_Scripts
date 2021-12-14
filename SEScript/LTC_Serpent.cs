@@ -124,11 +124,6 @@ namespace SEScript
                 {
                     item.Detonate();
                 }
-                for (int i = 0; i < 3; i++)
-                {
-                    int index = rnd.Next(0, 10);
-                    IGC.SendBroadcastMessage("MissilesChannel" + index.ToString(), "Missile|FinalFarewell", TransmissionDistance.TransmissionDistanceMax);
-                }
             }
 
             if(TimeStamp < GuideCount)
@@ -385,11 +380,6 @@ namespace SEScript
                                 }
                             case "SelfDestruct":
                                 {
-                                    for (int i = 0; i < 3; i++)
-                                    {
-                                        int index = rnd.Next(0, 10);
-                                        IGC.SendBroadcastMessage("MissilesChannel" + index.ToString(), "Missile|FinalFarewell", TransmissionDistance.TransmissionDistanceMax);
-                                    }
                                     foreach (var item in WarHeads)
                                     {
                                         item.Detonate();

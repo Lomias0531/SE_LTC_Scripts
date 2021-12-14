@@ -38,7 +38,6 @@ namespace SEScript
         CurrentStatus curStatus = CurrentStatus.Offline;
         List<long> itemRemoval;
         CommandProcessor processor;
-        int CheckCount = 0;
         enum TargetType
         {
             HostileObject,
@@ -63,23 +62,7 @@ namespace SEScript
                 CheckComponents();
                 return;
             }
-            CheckCount += 1;
-            if(CheckCount>=10)
-            {
-                processor.QueueAction(CheckMissileStatus, activeMissilesIndex.Count);
-                //CheckMissileStatus();
-                processor.QueueAction(CheckHostileStatus, activeTargetsIndex.Count);
-                //CheckHostileStatus();
-                //CheckFriendlyStatus();
-                processor.QueueAction(CheckFriendlyStatus, activeFriendlyIndex.Count);
-                CheckCount = 0;
-            }
-            processor.QueueAction(ProcessBroadcastInfo, channelListeners.Count);
-            //ProcessBroadcastInfo();
-            processor.QueueAction(AsyncInfo, activeFriendlyIndex.Count + activeFriendlyIndex.Count);
-            //AsyncInfo();
-            processor.QueueAction(RemoveItems, itemRemoval.Count);
-            processor.QueueAction(DisplayMessages, DisplayMessage.Count);
+
             processor.Update();
             //DisplayMessages();
         }
@@ -138,7 +121,27 @@ namespace SEScript
             ShowMessage("System online");
             processor = new CommandProcessor();
             processor.InitProcessor();
+
+            processor.QueueAction(CheckMissileStatus, 1);
+            //CheckMissileStatus();
+            processor.QueueAction(CheckHostileStatus, 1);
+            //CheckHostileStatus();
+            //CheckFriendlyStatus();
+            processor.QueueAction(CheckFriendlyStatus, 1);
+            processor.QueueAction(ProcessBroadcastInfo, 1);
+            //ProcessBroadcastInfo();
+            processor.QueueAction(AsyncInfo, 2);
+            //AsyncInfo();
+            processor.QueueAction(RemoveItems, 2);
+            processor.QueueAction(DisplayMessages, 1);
+
+            processor.QueueAction(WaitProcess, 5);
+
             CheckReady = true;
+        }
+        void WaitProcess()
+        {
+            return;
         }
         /// <summary>
         /// 检查所有导弹状态
@@ -204,7 +207,6 @@ namespace SEScript
                 if(channelListeners[i].HasPendingMessage)
                 {
                     MyIGCMessage message = channelListeners[i].AcceptMessage();
-                    Echo(message.Data.ToString());
                     string[] data = message.Data.ToString().Split('|');
                     if (message.Tag.Contains("MissilesChannel"))
                     {
@@ -464,9 +466,9 @@ namespace SEScript
         }
         void RemoveItems()
         {
-            for(int i = 0;i<itemRemoval.Count;i++)
+            for (int i = 0; i < itemRemoval.Count; i++)
             {
-                if(activeFriendlyIndex.Contains(itemRemoval[i]))
+                if (activeFriendlyIndex.Contains(itemRemoval[i]))
                 {
                     activeFriendlyIndex.Remove(itemRemoval[i]);
                     activeFriendly.Remove(itemRemoval[i]);
@@ -513,32 +515,34 @@ namespace SEScript
         class CommandProcessor
         {
             List<LTCCommand> queuedActions;
-            List<LTCCommand> actionDispose;
-            int processedTime = 0;
+            int processSequence = 0;
+            int processSequenceMax = 0;
             public void InitProcessor()
             {
                 queuedActions = new List<LTCCommand>();
-                actionDispose = new List<LTCCommand>();
             }
             public void Update()
             {
-                processedTime = 0;
-                foreach (var command in queuedActions)
-                {
-                    if (processedTime + command.runCheck >= 50)
-                    {
-                        break;
-                    }
-                    command.ExeCommand();
-                    processedTime += command.runCheck;
-                    actionDispose.Add(command);
-                }
-                queuedActions.RemoveAll((x) => actionDispose.Contains(x));
+                queuedActions[processSequence].action.Invoke();
+                processSequence += 1;
+                if (processSequence >= processSequenceMax) processSequence = 0;
             }
             public void QueueAction(Action action,int check)
             {
                 LTCCommand cmd = new LTCCommand(action,check);
+                processSequenceMax += check;
                 queuedActions.Add(cmd);
+                if(check>1)
+                {
+                    for(int i = 0;i<check-1;i++)
+                    {
+                        queuedActions.Add(new LTCCommand(ProcessTick, 1));
+                    }
+                }
+            }
+            void ProcessTick()
+            {
+                return;
             }
         }
         class LTCCommand
