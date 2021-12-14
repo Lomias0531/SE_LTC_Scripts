@@ -34,8 +34,11 @@ namespace SEScript
         Random rnd;
         List<string> DisplayMessage;
         IMyTextSurface MessageBoard;
+        IMyTextPanel Radar;
         CurrentStatus curStatus = CurrentStatus.Offline;
         List<long> itemRemoval;
+        CommandProcessor processor;
+        int CheckCount = 0;
         enum TargetType
         {
             HostileObject,
@@ -51,7 +54,7 @@ namespace SEScript
         }
         Program()
         {
-            Runtime.UpdateFrequency = UpdateFrequency.Update10;
+            Runtime.UpdateFrequency = UpdateFrequency.Update1;
         }
         void Main(string arg,UpdateType updateType)
         {
@@ -60,18 +63,25 @@ namespace SEScript
                 CheckComponents();
                 return;
             }
-            switch(updateType)
+            CheckCount += 1;
+            if(CheckCount>=10)
             {
-                case UpdateType.Update10 | UpdateType.Update1:
-                    CheckMissileStatus();
-                    CheckHostileStatus();
-                    CheckFriendlyStatus();
-                    break;
-                case UpdateType.IGC:
-                    ProcessBroadcastInfo();
-                    AsyncInfo();
-                    break;
+                processor.QueueAction(CheckMissileStatus, activeMissilesIndex.Count);
+                //CheckMissileStatus();
+                processor.QueueAction(CheckHostileStatus, activeTargetsIndex.Count);
+                //CheckHostileStatus();
+                //CheckFriendlyStatus();
+                processor.QueueAction(CheckFriendlyStatus, activeFriendlyIndex.Count);
+                CheckCount = 0;
             }
+            processor.QueueAction(ProcessBroadcastInfo, channelListeners.Count);
+            //ProcessBroadcastInfo();
+            processor.QueueAction(AsyncInfo, activeFriendlyIndex.Count + activeFriendlyIndex.Count);
+            //AsyncInfo();
+            processor.QueueAction(RemoveItems, itemRemoval.Count);
+            processor.QueueAction(DisplayMessages, DisplayMessage.Count);
+            processor.Update();
+            //DisplayMessages();
         }
         void CheckComponents()
         {
@@ -82,6 +92,7 @@ namespace SEScript
                 curStatus = CurrentStatus.Online;
             }
             MessageBoard = ((IMyProgrammableBlock)Me).GetSurface(0);
+            Radar = (IMyTextPanel)GridTerminalSystem.GetBlockWithName("LTC_Radar");
             InitSystem();
         }
         /// <summary>
@@ -95,7 +106,8 @@ namespace SEScript
             activeMissiles = new Dictionary<long, MissileStandard>();
             activeFriendlyIndex = new List<long>();
             activeFriendly = new Dictionary<long, TargetStandard>();
-            Runtime.UpdateFrequency = UpdateFrequency.Update10;
+            itemRemoval = new List<long>();
+            Runtime.UpdateFrequency = UpdateFrequency.Update1;
             listener = IGC.UnicastListener;
             channelListeners = new List<IMyBroadcastListener>();
             //为导弹分配10个频道，每次向导弹发送消息以及导弹发送消息均采用随机3个频道以避免信息丢失
@@ -124,6 +136,8 @@ namespace SEScript
             DisplayMessage = new List<string>();
             itemRemoval = new List<long>();
             ShowMessage("System online");
+            processor = new CommandProcessor();
+            processor.InitProcessor();
             CheckReady = true;
         }
         /// <summary>
@@ -146,15 +160,6 @@ namespace SEScript
                         continue;
                 }
             }
-            if(itemRemoval.Count>0)
-            {
-                for(int i = 0;i< itemRemoval.Count;i++)
-                {
-                    activeMissiles.Remove(itemRemoval[i]);
-                    activeMissilesIndex.Remove(itemRemoval[i]);
-                    ShowMessage("导弹" + itemRemoval[i].ToString() + "已销毁");
-                }
-            }
         }
         /// <summary>
         /// 检查所有敌方目标状态
@@ -169,15 +174,6 @@ namespace SEScript
                 {
                     itemRemoval.Add(activeTargetsIndex[i]);
                     i += 1;
-                }
-            }
-            if(itemRemoval.Count>0)
-            {
-                for(int i = 0;i<itemRemoval.Count;i++)
-                {
-                    activeTargets.Remove(itemRemoval[i]);
-                    activeTargetsIndex.Remove(itemRemoval[i]);
-                    ShowMessage("敌方目标" + itemRemoval[i].ToString() + "已摧毁");
                 }
             }
         }
@@ -195,15 +191,6 @@ namespace SEScript
                     else
                         i = 0;
                         continue;
-                }
-            }
-            if(itemRemoval.Count>0)
-            {
-                for(int i = 0;i<itemRemoval.Count;i++)
-                {
-                    activeFriendlyIndex.Remove(itemRemoval[i]);
-                    activeTargets.Remove(itemRemoval[i]);
-                    ShowMessage("己方单位" + itemRemoval[i].ToString() + "已失联");
                 }
             }
         }
@@ -238,19 +225,19 @@ namespace SEScript
                                         }
                                         break;
                                     }
-                                case "FinalFarewell"://导弹发送引爆消息，从导弹列表中移除
-                                    {
-                                        if(activeMissiles.ContainsKey(message.Source))
-                                        {
-                                            activeMissiles.Remove(message.Source);
-                                        }
-                                        if(activeMissilesIndex.Contains(message.Source))
-                                        {
-                                            activeMissilesIndex.Remove(message.Source);
-                                        }
-                                        ShowMessage("导弹" + message.Source.ToString() + "被引爆");
-                                        break;
-                                    }
+                                //case "FinalFarewell"://导弹发送引爆消息，从导弹列表中移除
+                                //    {
+                                //        if(activeMissiles.ContainsKey(message.Source))
+                                //        {
+                                //            activeMissiles.Remove(message.Source);
+                                //        }
+                                //        if(activeMissilesIndex.Contains(message.Source))
+                                //        {
+                                //            activeMissilesIndex.Remove(message.Source);
+                                //        }
+                                //        ShowMessage("导弹" + message.Source.ToString() + "被引爆");
+                                //        break;
+                                //    }
                                 case "LaunchConfirmed"://导弹发送发射消息，检查列表中是否有相同ID的导弹，并新增项目
                                     {
                                         if (activeMissiles.ContainsKey(message.Source))
@@ -459,72 +446,56 @@ namespace SEScript
                 {
                     DisplayMessage.RemoveAt(0);
                 }
-                DisplayMessage.Add(msg);
-                string info = "T.E.M.K.H.A.N.    " + curStatus.ToString().ToUpper() + "\r\n=====================\r\n";
-                info += "已激活导弹：" + activeMissilesIndex.Count.ToString() + "\r\n";
-                info += "已联网的友方单位：" + activeFriendlyIndex.Count.ToString() + "\r\n";
-                info += "已发现的敌方目标：" + activeTargetsIndex.Count.ToString() + "\r\n";
-                info += "=====================\r\n";
-                for (int i = 0;i<DisplayMessage.Count;i++)
-                {
-                    info += DisplayMessage[i] + "\r\n";
-                }
-                MessageBoard.WriteText(info);
+                DisplayMessage.Add(msg);                
             }
         }
-        class CommandProcessor
+        void DisplayMessages()
         {
-            Queue<LTCCommand> queuedFixedActions;
-            Queue<LTCCommand> queuedTempActions;
-            float timeElapsed = 0;
-            readonly float elapseTimeMax;
-            public void InitProcessor()
+            string info = "T.E.M.K.H.A.N.    " + curStatus.ToString().ToUpper() + "\r\n=====================\r\n";
+            info += "已激活导弹：" + activeMissilesIndex.Count.ToString() + "\r\n";
+            info += "已联网的友方单位：" + activeFriendlyIndex.Count.ToString() + "\r\n";
+            info += "已发现的敌方目标：" + activeTargetsIndex.Count.ToString() + "\r\n";
+            info += "=====================\r\n";
+            for (int i = 0; i < DisplayMessage.Count; i++)
             {
-                queuedTempActions = new Queue<LTCCommand>();
-                queuedFixedActions = new Queue<LTCCommand>();
+                info += DisplayMessage[i] + "\r\n";
             }
-            public void Update()
-            {
-                timeElapsed = 0;
-                foreach (var command in queuedFixedActions)
-                {
-                    command.ExeCommand();
-                }
-                foreach (var command in queuedTempActions)
-                {
-                    if (Runtime.LastRunTimeMs > (1f / 60f))
-                    {
-                        break;
-                    }
-                    command.ExeCommand();
-                    queuedTempActions.Dequeue();
-                }
-            }
-            public void QueueTempAction(Action action)
-            {
-                LTCCommand cmd = new LTCCommand(action,true);
-                queuedTempActions.Enqueue(cmd);
-            }
-            public void QueueTimedAction(Action action)
-            {
-                LTCCommand cmd = new LTCCommand(action, false);
-                queuedFixedActions.Enqueue(cmd);
-            }
+            MessageBoard.WriteText(info);
         }
-        class LTCCommand
+        void RemoveItems()
         {
-            public Action action;
-            public bool isTemp = true;
-            public LTCCommand(Action _action,bool _isTemp)
+            for(int i = 0;i<itemRemoval.Count;i++)
             {
-                action = _action;
-                isTemp = _isTemp;
+                if(activeFriendlyIndex.Contains(itemRemoval[i]))
+                {
+                    activeFriendlyIndex.Remove(itemRemoval[i]);
+                    activeFriendly.Remove(itemRemoval[i]);
+                    ShowMessage("己方单位" + itemRemoval[i].ToString() + "已失联");
+                    continue;
+                }
+                if (activeMissilesIndex.Contains(itemRemoval[i]))
+                {
+                    activeMissilesIndex.Remove(itemRemoval[i]);
+                    activeMissiles.Remove(itemRemoval[i]);
+                    ShowMessage("导弹" + itemRemoval[i].ToString() + "已销毁");
+                    continue;
+                }
+                if (activeTargetsIndex.Contains(itemRemoval[i]))
+                {
+                    activeTargetsIndex.Remove(itemRemoval[i]);
+                    activeTargets.Remove(itemRemoval[i]);
+                    ShowMessage("敌方目标" + itemRemoval[i].ToString() + "已摧毁");
+                    continue;
+                }
             }
-            public void ExeCommand()
-            {
-                action.Invoke();
-            }
+            itemRemoval.Clear();
         }
+        #region drawRadarMap
+        void DrawRadarMap()
+        {
+
+        }
+        #endregion
         class TargetStandard
         {
             public long TargetID;
@@ -538,6 +509,51 @@ namespace SEScript
         class MissileStandard : TargetStandard
         {
             public long LockedTarget;
-        }       
+        }
+        class CommandProcessor
+        {
+            List<LTCCommand> queuedActions;
+            List<LTCCommand> actionDispose;
+            int processedTime = 0;
+            public void InitProcessor()
+            {
+                queuedActions = new List<LTCCommand>();
+                actionDispose = new List<LTCCommand>();
+            }
+            public void Update()
+            {
+                processedTime = 0;
+                foreach (var command in queuedActions)
+                {
+                    if (processedTime + command.runCheck >= 50)
+                    {
+                        break;
+                    }
+                    command.ExeCommand();
+                    processedTime += command.runCheck;
+                    actionDispose.Add(command);
+                }
+                queuedActions.RemoveAll((x) => actionDispose.Contains(x));
+            }
+            public void QueueAction(Action action,int check)
+            {
+                LTCCommand cmd = new LTCCommand(action,check);
+                queuedActions.Add(cmd);
+            }
+        }
+        class LTCCommand
+        {
+            public Action action;
+            public int runCheck = 1;
+            public LTCCommand(Action _action,int _runCheck)
+            {
+                action = _action;
+                runCheck = _runCheck;
+            }
+            public void ExeCommand()
+            {
+                action.Invoke();
+            }
+        }    
     }
 }
