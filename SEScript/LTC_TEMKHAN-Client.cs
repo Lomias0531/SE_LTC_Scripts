@@ -164,6 +164,24 @@ namespace SEScript
                                     {
                                         case "SynchInfo":
                                             {
+                                                string[] targets = data[2].Split(',');
+                                                for (int t = 0; t < targets.Length; t++)
+                                                {
+                                                    if (string.IsNullOrEmpty(targets[t]))
+                                                    {
+                                                        break;
+                                                    }
+                                                    string[] info = targets[t].Split('/');
+                                                    long targetID = long.Parse(info[0]);
+                                                    if (!DetectedTargets.ContainsKey(targetID))
+                                                    {
+                                                        TargetStandard target = new TargetStandard();
+                                                        target.TargetID = targetID;
+                                                        DetectedTargets.Add(targetID, target);
+                                                    }
+                                                    Vector3D.TryParse(info[1], out DetectedTargets[targetID].TargetPos);
+                                                    Vector3D.TryParse(info[2], out DetectedTargets[targetID].TargetVel);
+                                                }
                                                 break;
                                             }
                                     }
@@ -238,7 +256,7 @@ namespace SEScript
             for (int i = 0; i < 3; i++)
             {
                 int index = rnd.Next(0, 5);
-                IGC.SendBroadcastMessage("FriendlyScoutChannel" + index.ToString(), "FriendlyScout|SynchSelfInfo|" + Me.CubeGrid.GetPosition().ToString("F3") + "|" + LTCShipControl.GetShipVelocities().LinearVelocity.ToString("F3"), TransmissionDistance.TransmissionDistanceMax);
+                IGC.SendBroadcastMessage("FriendlyShipChannel" + index.ToString(), "FriendlyShip|SynchSelfInfo|" + Me.CubeGrid.GetPosition().ToString("F3") + "|" + LTCShipControl.GetShipVelocities().LinearVelocity.ToString("F3"), TransmissionDistance.TransmissionDistanceMax);
             }
         }
         void Combat()
