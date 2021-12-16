@@ -8,8 +8,7 @@ namespace SEScript
 {
     class LTC_TEMKHAN_Client:API
     {
-        List<TargetStandard> NetworkTargets;
-        List<MyDetectedEntityInfo> DetectedTargets;
+        Dictionary<long,TargetStandard> DetectedTargets;
         List<IMyLargeTurretBase> AutoWeapons;
         List<IMyAirtightSlideDoor> MissileHatch;
         IMyShipController LTCShipControl;
@@ -20,6 +19,10 @@ namespace SEScript
         int MissileLaunchFrequency = 240;
         IMyUnicastListener unicastListener;
         List<IMyBroadcastListener> channelListeners;
+        int SynchTime = 0;
+        int SynchTargetTime = 0;
+        Random rnd;
+        long ServerAddress = 0;
 
         enum ShipStatus
         {
@@ -72,9 +75,21 @@ namespace SEScript
                 return;
             }
             GetTargets();
-            CheckStatus();
             ProcessBroadcastMessage();
-            switch(MyStatus)
+            CheckStatus();
+            if (SynchTime > 60)
+            {
+                if (ServerAddress != 0)
+                {
+                    SynchInfoToServer();
+                }
+                else
+                {
+                    IGC.SendBroadcastMessage("FriendlyShipChannel0", "FriendlyShip|RegisterShip", TransmissionDistance.TransmissionDistanceMax);
+                }
+                SynchTime = 0;
+            }
+            switch (MyStatus)
             {
                 case ShipStatus.Idle:
                     {
@@ -97,18 +112,24 @@ namespace SEScript
         }
         void InitSystem()
         {
-            NetworkTargets = new List<TargetStandard>();
-            DetectedTargets = new List<MyDetectedEntityInfo>();
+            DetectedTargets = new Dictionary<long, TargetStandard>();
             AutoWeapons = new List<IMyLargeTurretBase>();
             MissileHatch = new List<IMyAirtightSlideDoor>();
             unicastListener = IGC.UnicastListener;
             channelListeners = new List<IMyBroadcastListener>();
+            IMyBroadcastListener ServerChannel = IGC.RegisterBroadcastListener("FriendlyShipChannel");
+            channelListeners.Add(ServerChannel);
+            IMyBroadcastListener turretChannel = IGC.RegisterBroadcastListener("ShipArtilleryChannel");
+            channelListeners.Add(turretChannel);
+            IMyBroadcastListener PointDefenseChannel = IGC.RegisterBroadcastListener("ShipPDChannel");
+            channelListeners.Add(PointDefenseChannel);
+            rnd = new Random((int)Me.EntityId);
 
             CheckedReady = true;
         }
         void CheckStatus()
         {
-            if(NetworkTargets.Count + DetectedTargets.Count > 0)
+            if(DetectedTargets.Count > 0)
             {
                 if(MyStatus != ShipStatus.Combating)
                 {
@@ -129,17 +150,95 @@ namespace SEScript
         {
             for(int i = 0;i<channelListeners.Count;i++)
             {
+                if(channelListeners[i].HasPendingMessage)
+                {
+                    MyIGCMessage message = channelListeners[i].AcceptMessage();
+                    string[] data = message.Data.ToString().Split('|');
+                    switch(message.Tag)
+                    {
+                        case "FriendlyShipChannel":
+                            {
+                                if(data[0] == "FriendlyShip")
+                                {
+                                    switch(data[1])
+                                    {
+                                        case "SynchInfo":
+                                            {
+                                                break;
+                                            }
+                                    }
+                                }
+                                break;
+                            }
+                        case "ShipArtilleryChannel":
+                            {
+                                break;
+                            }
+                        case "ShipPDChannel":
+                            {
+                                break;
+                            }
+                    }
+                }
+            }
+            if(unicastListener.HasPendingMessage)
+            {
+                MyIGCMessage message = unicastListener.AcceptMessage();
+                switch(message.Tag)
+                {
 
+                }
             }
         }
         void GetTargets()
         {
+            DetectedTargets.Clear();
             if(AutoWeapons.Count > 0)
             {
                 foreach (var item in AutoWeapons)
                 {
-
+                    MyDetectedEntityInfo info = item.GetTargetedEntity();
+                    if(!DetectedTargets.ContainsKey(info.EntityId))
+                    {
+                        TargetStandard target = new TargetStandard()
+                        {
+                            TargetID = info.EntityId,
+                            TargetVel = (Vector3D)info.Velocity,
+                            TargetPos = info.BoundingBox.Center
+                        };
+                        DetectedTargets.Add(info.EntityId, target);
+                    }
                 }
+            }
+
+            //向服务器发送自己探测到的目标
+            if (DetectedTargets.Count > 0)
+            {
+                SynchTargetTime += 1;
+                if (SynchTargetTime >= 60)
+                {
+                    string targetInfo = "";
+                    foreach (var item in DetectedTargets)
+                    {
+                        targetInfo += item.Value.TargetID + "/" + item.Value.TargetPos.ToString("F3") + "/" + item.Value.TargetVel.ToString("F3") + ",";
+                    }
+
+                    for (int i = 0; i < 3; i++)
+                    {
+                        int index = rnd.Next(0, 10);
+                        IGC.SendBroadcastMessage("HostileInfoChannel" + index.ToString(), "HostileTarget|UpdateTargetInfo|" + targetInfo, TransmissionDistance.TransmissionDistanceMax);
+                    }
+                    SynchTargetTime = 0;
+                }
+            }
+        }
+        void SynchInfoToServer()
+        {
+
+            for (int i = 0; i < 3; i++)
+            {
+                int index = rnd.Next(0, 5);
+                IGC.SendBroadcastMessage("FriendlyScoutChannel" + index.ToString(), "FriendlyScout|SynchSelfInfo|" + Me.CubeGrid.GetPosition().ToString("F3") + "|" + LTCShipControl.GetShipVelocities().LinearVelocity.ToString("F3"), TransmissionDistance.TransmissionDistanceMax);
             }
         }
         void Combat()
