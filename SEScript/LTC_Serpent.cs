@@ -395,6 +395,11 @@ namespace SEScript
                                     }
                                     break;
                                 }
+                            case "ConfirmLaunch":
+                                {
+                                    Launch();
+                                    break;
+                                }
                         }
                     }
                 }

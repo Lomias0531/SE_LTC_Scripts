@@ -362,6 +362,7 @@ namespace SEScript
                                             target.TargetID = message.Source;
                                             activeFriendly.Add(message.Source, target);
                                         }
+                                        IGC.SendUnicastMessage(message.Source, "FriendlyShipChannel", "ConfirmedRegister");
                                         ShowMessage("友方舰船" + message.Source.ToString() + "已连接");
                                         break;
                                     }
