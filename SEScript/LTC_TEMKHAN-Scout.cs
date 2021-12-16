@@ -13,8 +13,8 @@ namespace SEScript
         bool CheckReady = false;
         long ServerAddress = 0;
         int selfCheckTime = 0;
-        int asyncTime = 0;
-        int asyncTargetTime = 0;
+        int SynchTime = 0;
+        int SynchTargetTime = 0;
         IMyShipController controller;
         Random rnd;
         List<IMyBroadcastListener> channels;
@@ -37,22 +37,22 @@ namespace SEScript
                 CheckComponents();
                 selfCheckTime = 0;
             }
-            asyncTime += 1;
+            SynchTime += 1;
             ProcessMessages();
-            if (asyncTime > 6)
+            if (SynchTime > 6)
             {
                 if(ServerAddress != 0)
                 {
-                    AsyncInfoToServer();
+                    SynchInfoToServer();
                 }else
                 {
                     IGC.SendBroadcastMessage("FriendlyScoutChannel0", "FriendlyScout|RegisterScout", TransmissionDistance.TransmissionDistanceMax);
                 }
-                asyncTime = 0;
+                SynchTime = 0;
             }
-            AsyncHostileInfoToServer();
+            SynchHostileInfoToServer();
             Echo(ServerAddress.ToString());
-            Echo("Async time: " + asyncTime.ToString());
+            Echo("Synch time: " + SynchTime.ToString());
             Echo("Sefl check in: " + selfCheckTime.ToString());
             Echo(detectedTargets.Count.ToString());
         }
@@ -99,16 +99,16 @@ namespace SEScript
             unicastChannel = IGC.UnicastListener;
             CheckReady = true;
         }
-        void AsyncInfoToServer()
+        void SynchInfoToServer()
         {
            
             for(int i = 0;i<3;i++)
             {
                 int index = rnd.Next(0, 5);
-                IGC.SendBroadcastMessage("FriendlyScoutChannel" + index.ToString(), "FriendlyScout|AsyncSelfInfo|" + Me.CubeGrid.GetPosition().ToString("F3") + "|" + controller.GetShipVelocities().LinearVelocity.ToString("F3"),TransmissionDistance.TransmissionDistanceMax);
+                IGC.SendBroadcastMessage("FriendlyScoutChannel" + index.ToString(), "FriendlyScout|SynchSelfInfo|" + Me.CubeGrid.GetPosition().ToString("F3") + "|" + controller.GetShipVelocities().LinearVelocity.ToString("F3"),TransmissionDistance.TransmissionDistanceMax);
             }
         }
-        void AsyncHostileInfoToServer()
+        void SynchHostileInfoToServer()
         {
             detectedTargets.Clear();
             for (int i = 0; i < autoWeapons.Count; i++)
@@ -120,8 +120,8 @@ namespace SEScript
             }
             if(detectedTargets.Count > 0)
             {
-                asyncTargetTime += 1;
-                if(asyncTargetTime >= 6)
+                SynchTargetTime += 1;
+                if(SynchTargetTime >= 6)
                 {
                     string targetInfo = "";
                     for (int i = 0; i < detectedTargets.Count; i++)
@@ -135,12 +135,12 @@ namespace SEScript
                         int index = rnd.Next(0, 10);
                         IGC.SendBroadcastMessage("HostileInfoChannel" + index.ToString(), "HostileTarget|UpdateTargetInfo|" + targetInfo, TransmissionDistance.TransmissionDistanceMax);
                     }
-                    asyncTargetTime = 0;
+                    SynchTargetTime = 0;
                 }
             }
             else
             {
-                asyncTargetTime = 6;
+                SynchTargetTime = 6;
             }
         }
         void ProcessMessages()

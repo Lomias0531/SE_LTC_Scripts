@@ -62,7 +62,6 @@ namespace SEScript
                 CheckComponents();
                 return;
             }
-
             processor.Update();
             //DisplayMessages();
         }
@@ -122,20 +121,20 @@ namespace SEScript
             processor = new CommandProcessor();
             processor.InitProcessor();
 
-            processor.QueueAction(CheckMissileStatus, 1);
+            processor.QueueAction(CheckMissileStatus, 1, 10);
             //CheckMissileStatus();
-            processor.QueueAction(CheckHostileStatus, 1);
+            processor.QueueAction(CheckHostileStatus, 1, 10);
             //CheckHostileStatus();
             //CheckFriendlyStatus();
-            processor.QueueAction(CheckFriendlyStatus, 1);
-            processor.QueueAction(ProcessBroadcastInfo, 1);
+            processor.QueueAction(CheckFriendlyStatus, 1, 10);
+            processor.QueueAction(ProcessBroadcastInfo, 1, 1);
             //ProcessBroadcastInfo();
-            processor.QueueAction(AsyncInfo, 2);
-            //AsyncInfo();
-            processor.QueueAction(RemoveItems, 2);
-            processor.QueueAction(DisplayMessages, 1);
+            processor.QueueAction(SynchInfo, 2, 5);
+            //SynchInfo();
+            processor.QueueAction(RemoveItems, 2, 10);
+            processor.QueueAction(DisplayMessages, 1, 1);
 
-            processor.QueueAction(WaitProcess, 5);
+            processor.QueueAction(WaitProcess, 5, 1);
 
             CheckReady = true;
         }
@@ -185,8 +184,8 @@ namespace SEScript
             itemRemoval.Clear();
             for(int i = 0;i<activeFriendlyIndex.Count;i++)
             {
-                activeFriendly[activeFriendlyIndex[i]].AsyncTime -= 1;
-                if(activeFriendly[activeFriendlyIndex[i]].AsyncTime <= 0)
+                activeFriendly[activeFriendlyIndex[i]].TargetScanLife -= 1;
+                if(activeFriendly[activeFriendlyIndex[i]].TargetScanLife <= 0)
                 {
                     itemRemoval.Add(activeFriendlyIndex[i]);
                     if (i > 0)
@@ -224,22 +223,10 @@ namespace SEScript
                                         {
                                             activeMissiles[message.Source].TargetScanLife = 12;
                                             ShowMessage("导弹" + message.Source.ToString() + "确认状态");
+                                            Vector3D.TryParse(data[2], out activeMissiles[message.Source].TargetPos);
                                         }
                                         break;
                                     }
-                                //case "FinalFarewell"://导弹发送引爆消息，从导弹列表中移除
-                                //    {
-                                //        if(activeMissiles.ContainsKey(message.Source))
-                                //        {
-                                //            activeMissiles.Remove(message.Source);
-                                //        }
-                                //        if(activeMissilesIndex.Contains(message.Source))
-                                //        {
-                                //            activeMissilesIndex.Remove(message.Source);
-                                //        }
-                                //        ShowMessage("导弹" + message.Source.ToString() + "被引爆");
-                                //        break;
-                                //    }
                                 case "LaunchConfirmed"://导弹发送发射消息，检查列表中是否有相同ID的导弹，并新增项目
                                     {
                                         if (activeMissiles.ContainsKey(message.Source))
@@ -253,7 +240,6 @@ namespace SEScript
                                         MissileStandard missile = new MissileStandard();
                                         missile.TargetID = message.Source;
                                         missile.TargetScanLife = 12;
-                                        missile.AsyncTime = 3;
                                         missile.type = TargetType.LaunchedMissile;
                                         int targetIndex = rnd.Next(0, activeTargetsIndex.Count);
                                         missile.LockedTarget = activeTargetsIndex[targetIndex];
@@ -323,18 +309,17 @@ namespace SEScript
                                             TargetStandard target = new TargetStandard();
                                             target.type = TargetType.FriendlyScout;
                                             target.TargetID = message.Source;
-                                            target.AsyncTime = 12;
                                             activeFriendly.Add(message.Source, target);
                                         }
                                         IGC.SendUnicastMessage(message.Source, "FriendlyScoutChannel", "ConfirmedRegister");
                                         ShowMessage("友方侦察机" + message.Source.ToString() + "已连接");
                                         break;
                                     }
-                                case "AsyncSelfInfo":
+                                case "SynchSelfInfo":
                                     {
                                         if(activeFriendly.ContainsKey(message.Source))
                                         {
-                                            activeFriendly[message.Source].AsyncTime = 120;
+
                                         }else
                                         {
                                             if (!activeFriendlyIndex.Contains(message.Source))
@@ -346,7 +331,6 @@ namespace SEScript
                                                 TargetStandard target = new TargetStandard();
                                                 target.type = TargetType.FriendlyScout;
                                                 target.TargetID = message.Source;
-                                                target.AsyncTime = 12;
                                                 activeFriendly.Add(message.Source, target);
                                             }
                                             ShowMessage("友方侦察机" + message.Source.ToString() + "已连接");
@@ -376,19 +360,18 @@ namespace SEScript
                                             TargetStandard target = new TargetStandard();
                                             target.type = TargetType.FriendlyShip;
                                             target.TargetID = message.Source;
-                                            target.AsyncTime = 6;
                                             activeFriendly.Add(message.Source, target);
                                         }
                                         ShowMessage("友方舰船" + message.Source.ToString() + "已连接");
                                         break;
                                     }
-                                case "AsyncSelfInfo":
+                                case "SynchSelfInfo":
                                     {
                                         if (activeFriendly.ContainsKey(message.Source))
                                         {
                                             Vector3D.TryParse(data[2], out activeFriendly[message.Source].TargetPos);
                                             Vector3D.TryParse(data[3], out activeFriendly[message.Source].TargetVel);
-                                            activeFriendly[message.Source].AsyncTime = 60;
+                                            activeFriendly[message.Source].TargetScanLife = 6;
                                             ShowMessage("友方舰船" + message.Source.ToString() + "同步单位信息");
                                         }
                                         break;
@@ -403,42 +386,38 @@ namespace SEScript
         /// <summary>
         /// 向导弹或友方舰船同步消息
         /// </summary>
-        void AsyncInfo()
+        void SynchInfo()
         {
+            //向导弹同步信息
             for(int i = 0;i<activeMissilesIndex.Count;i++)
             {
-                activeMissiles[activeMissilesIndex[i]].AsyncTime -= 1;
+                ShowMessage("向导弹" + activeMissilesIndex[i].ToString() + "同步消息");
+                string MissileTargetInfo;
 
-                if (activeMissiles[activeMissilesIndex[i]].AsyncTime <= 0)
+                if (activeTargets.Count == 0)
                 {
-                    ShowMessage("向导弹" + activeMissilesIndex[i].ToString() + "同步消息");
-                    string targetInfo;
-
-                    if (activeTargets.Count == 0)
+                    IGC.SendUnicastMessage(activeMissilesIndex[i], "MissilesChannel", "Missile|StatusIdle");
+                }
+                else
+                {
+                    if (!activeTargets.ContainsKey(activeMissiles[activeMissilesIndex[i]].LockedTarget))
                     {
-                        for (int d = 0; d < 3; d++)
-                        {
-                            int index = rnd.Next(0, 10);
-                            IGC.SendUnicastMessage(activeMissilesIndex[i], "MissilesChannel" + index.ToString(), "Missile|StatusIdle");
-                        }
-                    }else
-                    {
-                        if (!activeTargets.ContainsKey(activeMissiles[activeMissilesIndex[i]].LockedTarget))
-                        {
-                            int targetIndex = rnd.Next(0, activeTargetsIndex.Count);
-                            activeMissiles[activeMissilesIndex[i]].LockedTarget = activeTargetsIndex[targetIndex];
-                        }
-
-                        targetInfo = activeTargets[activeMissiles[activeMissilesIndex[i]].LockedTarget].TargetPos.ToString() + "|" + activeTargets[activeMissiles[activeMissilesIndex[i]].LockedTarget].TargetVel.ToString();
-                        for (int d = 0; d < 3; d++)
-                        {
-                            int index = rnd.Next(0, 10);
-                            IGC.SendUnicastMessage(activeMissilesIndex[i], "MissilesChannel" + index.ToString(), "Missile|AsyncTargetInfo|" + targetInfo);
-                        }
+                        int targetIndex = rnd.Next(0, activeTargetsIndex.Count);
+                        activeMissiles[activeMissilesIndex[i]].LockedTarget = activeTargetsIndex[targetIndex];
                     }
-                    activeMissiles[activeMissilesIndex[i]].AsyncTime = 3;
+
+                    MissileTargetInfo = activeTargets[activeMissiles[activeMissilesIndex[i]].LockedTarget].TargetPos.ToString() + "|" + activeTargets[activeMissiles[activeMissilesIndex[i]].LockedTarget].TargetVel.ToString();
+                    IGC.SendUnicastMessage(activeMissilesIndex[i], "MissilesChannel", "Missile|SynchTargetInfo|" + MissileTargetInfo);
                 }
             }
+            //向友方舰船同步信息
+            ShowMessage("向友方舰船广播信息");
+            string targetInfo = "FriendlyShip|SynchInfo|";
+            for(int i = 0;i<activeTargetsIndex.Count;i++)
+            {
+                targetInfo += activeTargets[activeTargetsIndex[i]].TargetID + "/" + activeTargets[activeTargetsIndex[i]].TargetPos + "/" + activeTargets[activeTargetsIndex[i]].TargetVel + ",";
+            }
+            IGC.SendBroadcastMessage("FriendlyShipChannel", targetInfo, TransmissionDistance.TransmissionDistanceMax);
         }
         void ShowMessage(string msg)
         {
@@ -495,7 +474,7 @@ namespace SEScript
         #region drawRadarMap
         void DrawRadarMap()
         {
-
+            if (Radar == null) return;
         }
         #endregion
         class TargetStandard
@@ -505,7 +484,7 @@ namespace SEScript
             public Vector3D TargetPos;
             public Vector3D TargetVel;
             public TargetType type;
-            public int AsyncTime;
+            //public int SynchTime;
             //public QuaternionD TargetRot;
         }
         class MissileStandard : TargetStandard
@@ -523,13 +502,13 @@ namespace SEScript
             }
             public void Update()
             {
-                queuedActions[processSequence].action.Invoke();
+                queuedActions[processSequence].ExeCommand();
                 processSequence += 1;
                 if (processSequence >= processSequenceMax) processSequence = 0;
             }
-            public void QueueAction(Action action,int check)
+            public void QueueAction(Action action,int check,int frequency)
             {
-                LTCCommand cmd = new LTCCommand(action,check);
+                LTCCommand cmd = new LTCCommand(action, frequency);
                 processSequenceMax += check;
                 queuedActions.Add(cmd);
                 if(check>1)
@@ -549,6 +528,7 @@ namespace SEScript
         {
             public Action action;
             public int runCheck = 1;
+            int runCounter = 0;
             public LTCCommand(Action _action,int _runCheck)
             {
                 action = _action;
@@ -556,7 +536,9 @@ namespace SEScript
             }
             public void ExeCommand()
             {
-                action.Invoke();
+                if(runCounter == 0)
+                    action.Invoke();
+                runCounter = runCounter < runCheck ? runCounter += 1 : 0;
             }
         }    
     }

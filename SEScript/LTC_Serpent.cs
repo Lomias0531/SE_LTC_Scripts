@@ -365,7 +365,7 @@ namespace SEScript
                     {
                         switch (data[1])
                         {
-                            case "AsyncTargetInfo":
+                            case "SynchTargetInfo":
                                 {
                                     Vector3D pos = new Vector3D();
                                     Vector3D.TryParse(data[2], out pos);
@@ -374,7 +374,7 @@ namespace SEScript
                                     for (int i = 0; i < 3; i++)
                                     {
                                         int index = rnd.Next(0, 10);
-                                        IGC.SendBroadcastMessage("MissilesChannel" + index.ToString(), "Missile|ConfirmStatus", TransmissionDistance.TransmissionDistanceMax);
+                                        IGC.SendBroadcastMessage("MissilesChannel" + index.ToString(), "Missile|ConfirmStatus|" + Me.WorldVolume.Center.ToString(), TransmissionDistance.TransmissionDistanceMax);
                                     }
                                     break;
                                 }
@@ -391,7 +391,7 @@ namespace SEScript
                                     for (int i = 0; i < 3; i++)
                                     {
                                         int index = rnd.Next(0, 10);
-                                        IGC.SendBroadcastMessage("MissilesChannel" + index.ToString(), "Missile|ConfirmStatus", TransmissionDistance.TransmissionDistanceMax);
+                                        IGC.SendBroadcastMessage("MissilesChannel" + index.ToString(), "Missile|ConfirmStatus|" + Me.WorldVolume.Center.ToString(), TransmissionDistance.TransmissionDistanceMax);
                                     }
                                     break;
                                 }
