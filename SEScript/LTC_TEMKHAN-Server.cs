@@ -89,7 +89,6 @@ namespace SEScript
             activeFriendlyIndex = new List<long>();
             activeFriendly = new Dictionary<long, TargetStandard>();
             itemRemoval = new List<long>();
-            Runtime.UpdateFrequency = UpdateFrequency.Update1;
             listener = IGC.UnicastListener;
             channelListeners = new List<IMyBroadcastListener>();
             //为导弹分配10个频道，每次向导弹发送消息以及导弹发送消息均采用随机3个频道以避免信息丢失
@@ -121,26 +120,20 @@ namespace SEScript
             processor = new CommandProcessor();
             processor.InitProcessor();
 
-            processor.QueueAction(CheckMissileStatus, 1, 10);
+            processor.QueueAction(CheckMissileStatus, 2);
             //CheckMissileStatus();
-            processor.QueueAction(CheckHostileStatus, 1, 10);
+            processor.QueueAction(CheckHostileStatus, 2);
             //CheckHostileStatus();
             //CheckFriendlyStatus();
-            processor.QueueAction(CheckFriendlyStatus, 1, 10);
-            processor.QueueAction(ProcessBroadcastInfo, 1, 1);
+            processor.QueueAction(CheckFriendlyStatus, 2);
+            processor.QueueAction(ProcessBroadcastInfo, 5);
             //ProcessBroadcastInfo();
-            processor.QueueAction(SynchInfo, 2, 5);
+            processor.QueueAction(SynchInfo, 2);
             //SynchInfo();
-            processor.QueueAction(RemoveItems, 2, 10);
-            processor.QueueAction(DisplayMessages, 1, 1);
-
-            processor.QueueAction(WaitProcess, 5, 1);
+            processor.QueueAction(RemoveItems, 1);
+            processor.QueueAction(DisplayMessages, 5);
 
             CheckReady = true;
-        }
-        void WaitProcess()
-        {
-            return;
         }
         /// <summary>
         /// 检查所有导弹状态
@@ -446,30 +439,10 @@ namespace SEScript
         }
         void RemoveItems()
         {
-            for (int i = 0; i < itemRemoval.Count; i++)
-            {
-                if (activeFriendlyIndex.Contains(itemRemoval[i]))
-                {
-                    activeFriendlyIndex.Remove(itemRemoval[i]);
-                    activeFriendly.Remove(itemRemoval[i]);
-                    ShowMessage("己方单位" + itemRemoval[i].ToString() + "已失联");
-                    continue;
-                }
-                if (activeMissilesIndex.Contains(itemRemoval[i]))
-                {
-                    activeMissilesIndex.Remove(itemRemoval[i]);
-                    activeMissiles.Remove(itemRemoval[i]);
-                    ShowMessage("导弹" + itemRemoval[i].ToString() + "已销毁");
-                    continue;
-                }
-                if (activeTargetsIndex.Contains(itemRemoval[i]))
-                {
-                    activeTargetsIndex.Remove(itemRemoval[i]);
-                    activeTargets.Remove(itemRemoval[i]);
-                    ShowMessage("敌方目标" + itemRemoval[i].ToString() + "已摧毁");
-                    continue;
-                }
-            }
+            activeFriendlyIndex.RemoveAll((x) => itemRemoval.Contains(x));
+            activeMissilesIndex.RemoveAll((x) => itemRemoval.Contains(x));
+            activeTargetsIndex.RemoveAll((x) => itemRemoval.Contains(x));
+            
             itemRemoval.Clear();
         }
         #region drawRadarMap
@@ -492,54 +465,53 @@ namespace SEScript
         {
             public long LockedTarget;
         }
+        /*命令处理
+         * 2021/12/17
+         * 尝试通过以帧数计数的方式来执行命令的方法失败了，原因有可能是从集合中移除元素会消耗较长时间。
+         * 猜想：移除指令也会遍历集合？采用RemoveAll进行尝试
+         * 仅对作为索引的List进行变动，实际储存只增不减
+         * 另外，将命令执行改为以时间计数的方式
+        */
         class CommandProcessor
         {
-            List<LTCCommand> queuedActions;
-            int processSequence = 0;
-            int processSequenceMax = 0;
+            Queue<LTCCommand> queuedCommands;
             public void InitProcessor()
             {
-                queuedActions = new List<LTCCommand>();
+                queuedCommands = new Queue<LTCCommand>();
             }
             public void Update()
             {
-                queuedActions[processSequence].ExeCommand();
-                processSequence += 1;
-                if (processSequence >= processSequenceMax) processSequence = 0;
-            }
-            public void QueueAction(Action action,int check,int frequency)
-            {
-                LTCCommand cmd = new LTCCommand(action, frequency);
-                processSequenceMax += check;
-                queuedActions.Add(cmd);
-                if(check>1)
+                double timeElapsed = Runtime.TimeSinceLastRun.TotalSeconds;
+
+                foreach (LTCCommand cmd in queuedCommands)
                 {
-                    for(int i = 0;i<check-1;i++)
-                    {
-                        queuedActions.Add(new LTCCommand(ProcessTick, 1));
-                    }
+                    cmd.ExeCommand(timeElapsed);
                 }
             }
-            void ProcessTick()
+            public void QueueAction(Action action,int frequency)
             {
-                return;
+                LTCCommand cmd = new LTCCommand(action, frequency);
+                queuedCommands.Enqueue(cmd);
             }
         }
         class LTCCommand
         {
             public Action action;
-            public int runCheck = 1;
-            int runCounter = 0;
-            public LTCCommand(Action _action,int _runCheck)
+            readonly double runFrequency = 1;
+            double TimeSinceLastRun = 0;
+            public LTCCommand(Action _action,int frequency)
             {
                 action = _action;
-                runCheck = _runCheck;
+                runFrequency = 1f / frequency;
             }
-            public void ExeCommand()
+            public void ExeCommand(double timeElapsed)
             {
-                if(runCounter == 0)
+                TimeSinceLastRun += timeElapsed;
+                if(TimeSinceLastRun >= runFrequency)
+                {
                     action.Invoke();
-                runCounter = runCounter < runCheck ? runCounter += 1 : 0;
+                    TimeSinceLastRun = 0;
+                }
             }
         }    
     }
