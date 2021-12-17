@@ -130,7 +130,7 @@ namespace SEScript
             //ProcessBroadcastInfo();
             processor.QueueAction(SynchInfo, 2);
             //SynchInfo();
-            processor.QueueAction(RemoveItems, 1);
+            processor.QueueAction(RemoveItems, 2);
             processor.QueueAction(DisplayMessages, 5);
 
             CheckReady = true;
@@ -450,6 +450,22 @@ namespace SEScript
         {
             if (Radar == null) return;
         }
+        void DrawAxis()
+        {
+
+        }
+        void DrawTargets()
+        {
+
+        }
+        void DrawFriendly()
+        {
+
+        }
+        void DrawMissiles()
+        {
+
+        }
         #endregion
         class TargetStandard
         {
@@ -458,8 +474,6 @@ namespace SEScript
             public Vector3D TargetPos;
             public Vector3D TargetVel;
             public TargetType type;
-            //public int SynchTime;
-            //public QuaternionD TargetRot;
         }
         class MissileStandard : TargetStandard
         {
@@ -471,6 +485,7 @@ namespace SEScript
          * 猜想：移除指令也会遍历集合？采用RemoveAll进行尝试
          * 仅对作为索引的List进行变动，实际储存只增不减
          * 另外，将命令执行改为以时间计数的方式
+         * 此处借鉴WHIP大佬的设计，赞美他！
         */
         class CommandProcessor
         {
