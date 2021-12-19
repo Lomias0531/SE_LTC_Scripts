@@ -23,7 +23,7 @@ namespace SEScript
         float MissileMass = 1328;
         bool launched = false;
         Vector3D TargetPos;
-        //Vector3D TargetVel;
+        Vector3D TargetVel;
         float TimeStamp = 0;
         int BreakThroughCount = 0;
         Vector3D BreakThroughOffset;
@@ -36,6 +36,8 @@ namespace SEScript
         int EvadeDistance = 800;
 
         IMyUnicastListener unicastListener;
+        List<IMyBroadcastListener> channels;
+        long lockedTarget;
         void Main(string arg)
         {
             Echo(TimeStamp.ToString());
@@ -112,6 +114,9 @@ namespace SEScript
             spark = (IMyTimerBlock)GridTerminalSystem.GetBlockWithName("TriggerSpark");
 
             unicastListener = IGC.UnicastListener;
+            channels = new List<IMyBroadcastListener>();
+            IMyBroadcastListener channel = IGC.RegisterBroadcastListener("LTCCommonChannel");
+            channels.Add(channel);
             CheckReady = true;
             return;
         }
@@ -135,7 +140,7 @@ namespace SEScript
                 for (int i = 0; i < 3; i++)
                 {
                     int index = rnd.Next(0, 10);
-                    IGC.SendBroadcastMessage("MissilesChannel" + index.ToString(), "Missile|LaunchConfirmed", TransmissionDistance.TransmissionDistanceMax);
+                    IGC.SendBroadcastMessage("MissilesChannel" + index.ToString(), "LaunchConfirmed", TransmissionDistance.TransmissionDistanceMax);
                 }
             }
 
@@ -361,45 +366,46 @@ namespace SEScript
                 if (message.Tag.Contains("MissilesChannel"))
                 {
                     string[] data = message.Data.ToString().Split('|');
-                    if (data[0] == "Missile")
+                    switch (data[0])
                     {
-                        switch (data[1])
+                        case "SynchTargetInfo":
+                            {
+                                Vector3D.TryParse(data[1], out TargetPos);
+                                Vector3D.TryParse(data[2], out TargetVel);
+                                long.TryParse(data[3], out lockedTarget);
+                                break;
+                            }
+                        case "SelfDestruct":
+                            {
+                                foreach (var item in WarHeads)
+                                {
+                                    item.Detonate();
+                                }
+                                break;
+                            }
+                        case "StatusIdle":
+                            {
+                                break;
+                            }
+                        case "ApproveLaunch":
+                            {
+                                Launch();
+                                break;
+                            }
+                    }
+                }
+            }
+            for(int i = 0;i<channels.Count;i++)
+            {
+                if(channels[i].HasPendingMessage)
+                {
+                    MyIGCMessage message = channels[i].AcceptMessage();
+                    if (message.Data.ToString() == "RequestReply")
+                    {
+                        for (int d = 0; d < 3; d++)
                         {
-                            case "SynchTargetInfo":
-                                {
-                                    Vector3D pos = new Vector3D();
-                                    Vector3D.TryParse(data[2], out pos);
-                                    if (pos != null)
-                                        TargetPos = pos;
-                                    for (int i = 0; i < 3; i++)
-                                    {
-                                        int index = rnd.Next(0, 10);
-                                        IGC.SendBroadcastMessage("MissilesChannel" + index.ToString(), "Missile|ConfirmStatus|" + Me.WorldVolume.Center.ToString(), TransmissionDistance.TransmissionDistanceMax);
-                                    }
-                                    break;
-                                }
-                            case "SelfDestruct":
-                                {
-                                    foreach (var item in WarHeads)
-                                    {
-                                        item.Detonate();
-                                    }
-                                    break;
-                                }
-                            case "StatusIdle":
-                                {
-                                    for (int i = 0; i < 3; i++)
-                                    {
-                                        int index = rnd.Next(0, 10);
-                                        IGC.SendBroadcastMessage("MissilesChannel" + index.ToString(), "Missile|ConfirmStatus|" + Me.WorldVolume.Center.ToString(), TransmissionDistance.TransmissionDistanceMax);
-                                    }
-                                    break;
-                                }
-                            case "ConfirmLaunch":
-                                {
-                                    Launch();
-                                    break;
-                                }
+                            int index = rnd.Next(0, 10);
+                            IGC.SendBroadcastMessage("MissilesChannel" + index.ToString(), "ConfirmStatus|" + Me.WorldVolume.Center.ToString() + "|" + lockedTarget.ToString(), TransmissionDistance.TransmissionDistanceMax);
                         }
                     }
                 }

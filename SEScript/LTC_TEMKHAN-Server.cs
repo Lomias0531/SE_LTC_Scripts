@@ -29,7 +29,7 @@ namespace SEScript
         Dictionary<long, MissileStandard> activeMissiles;
         Dictionary<long, TargetStandard> activeFriendly;
         bool CheckReady = false;
-        IMyUnicastListener listener;
+        IMyUnicastListener uniListener;
         List<IMyBroadcastListener> channelListeners;
         Random rnd;
         List<string> DisplayMessage;
@@ -37,7 +37,8 @@ namespace SEScript
         IMyTextPanel Radar;
         CurrentStatus curStatus = CurrentStatus.Offline;
         List<long> itemRemoval;
-        CommandProcessor processor;
+
+        SequencedCommand SynchInfoCommands;
         enum TargetType
         {
             HostileObject,
@@ -62,8 +63,9 @@ namespace SEScript
                 CheckComponents();
                 return;
             }
-            processor.Update();
-            //DisplayMessages();
+            double deltaTime = Runtime.TimeSinceLastRun.TotalSeconds;
+            SynchInfoCommands.Commence(deltaTime);
+            ProcessBroadcastInfo();
         }
         void CheckComponents()
         {
@@ -89,105 +91,47 @@ namespace SEScript
             activeFriendlyIndex = new List<long>();
             activeFriendly = new Dictionary<long, TargetStandard>();
             itemRemoval = new List<long>();
-            listener = IGC.UnicastListener;
+            uniListener = IGC.UnicastListener;
             channelListeners = new List<IMyBroadcastListener>();
             //为导弹分配10个频道，每次向导弹发送消息以及导弹发送消息均采用随机3个频道以避免信息丢失
             for(int i = 0;i<10;i++)
             {
                 IMyBroadcastListener channel = IGC.RegisterBroadcastListener("MissilesChannel" + i.ToString());
+                channel.SetMessageCallback("MissilesChannel" + i.ToString());
                 channelListeners.Add(channel);
             }
             //为敌方信息分配10个频道，每次更新敌方信息均采用3个随机频道以避免信息丢失
             for (int i = 0; i < 10; i++)
             {
                 IMyBroadcastListener channel = IGC.RegisterBroadcastListener("HostileInfoChannel" + i.ToString());
+                channel.SetMessageCallback("HostileInfoChannel" + i.ToString());
                 channelListeners.Add(channel);
             }
             for(int i = 0;i<5;i++)
             {
                 IMyBroadcastListener channel = IGC.RegisterBroadcastListener("FriendlyScoutChannel" + i.ToString());
+                channel.SetMessageCallback("FriendlyScoutChannel" + i.ToString());
                 channelListeners.Add(channel);
             }
             for (int i = 0; i < 5; i++)
             {
                 IMyBroadcastListener channel = IGC.RegisterBroadcastListener("FriendlyShipChannel" + i.ToString());
+                channel.SetMessageCallback("FriendlyShipChannel" + i.ToString());
                 channelListeners.Add(channel);
             }
             rnd = new Random((int)Me.EntityId);
             DisplayMessage = new List<string>();
             itemRemoval = new List<long>();
             ShowMessage("System online");
-            processor = new CommandProcessor();
-            processor.InitProcessor();
 
-            processor.QueueAction(CheckMissileStatus, 2);
-            //CheckMissileStatus();
-            processor.QueueAction(CheckHostileStatus, 2);
-            //CheckHostileStatus();
-            //CheckFriendlyStatus();
-            processor.QueueAction(CheckFriendlyStatus, 2);
-            processor.QueueAction(ProcessBroadcastInfo, 5);
-            //ProcessBroadcastInfo();
-            processor.QueueAction(SynchInfo, 2);
-            //SynchInfo();
-            processor.QueueAction(RemoveItems, 2);
-            processor.QueueAction(DisplayMessages, 5);
+            //消息同步命令序列
+            SynchInfoCommands = new SequencedCommand();
+            SynchInfoCommands.AddCommand(RemoveItems,0);//清空字典
+            SynchInfoCommands.AddCommand(RequestReply,0.1);//要求回复
+            SynchInfoCommands.AddCommand(SynchInfo,0.5);//返回消息
+            SynchInfoCommands.AddCommand(DisplayMessages,0.1);//显示信息
 
             CheckReady = true;
-        }
-        /// <summary>
-        /// 检查所有导弹状态
-        /// </summary>
-        void CheckMissileStatus()
-        {
-            itemRemoval.Clear();
-            for (int i = 0; i < activeMissilesIndex.Count; i++)
-            {
-                activeMissiles[activeMissilesIndex[i]].TargetScanLife -= 1;
-
-                if (activeMissiles[activeMissilesIndex[i]].TargetScanLife <= 0)
-                {
-                    itemRemoval.Add(activeMissilesIndex[i]);
-                    if (i > 0)
-                        i -= 1;
-                    else
-                        i = 0;
-                        continue;
-                }
-            }
-        }
-        /// <summary>
-        /// 检查所有敌方目标状态
-        /// </summary>
-        void CheckHostileStatus()
-        {
-            itemRemoval.Clear();
-            for (int i = 0; i <activeTargetsIndex.Count; i++)
-            {
-                activeTargets[activeTargetsIndex[i]].TargetScanLife -= 1;
-                if (activeTargets[activeTargetsIndex[i]].TargetScanLife <= 0)
-                {
-                    itemRemoval.Add(activeTargetsIndex[i]);
-                    i += 1;
-                }
-            }
-        }
-        void CheckFriendlyStatus()
-        {
-            itemRemoval.Clear();
-            for(int i = 0;i<activeFriendlyIndex.Count;i++)
-            {
-                activeFriendly[activeFriendlyIndex[i]].TargetScanLife -= 1;
-                if(activeFriendly[activeFriendlyIndex[i]].TargetScanLife <= 0)
-                {
-                    itemRemoval.Add(activeFriendlyIndex[i]);
-                    if (i > 0)
-                        i--;
-                    else
-                        i = 0;
-                        continue;
-                }
-            }
         }
         /// <summary>
         /// 处理接收到的消息
@@ -196,102 +140,110 @@ namespace SEScript
         {
             for(int i = 0;i<channelListeners.Count;i++)
             {
-                if(channelListeners[i].HasPendingMessage)
+                while(channelListeners[i].HasPendingMessage)
                 {
                     MyIGCMessage message = channelListeners[i].AcceptMessage();
                     string[] data = message.Data.ToString().Split('|');
                     if (message.Tag.Contains("MissilesChannel"))
                     {
-                        if(data[0] == "Missile")
+                        switch (data[0])
                         {
-                            switch(data[1])
-                            {
-                                default:
+                            default:
+                                {
+                                    break;
+                                }
+                            case "ConfirmStatus"://导弹回复状态确认消息，刷新导弹确认时间
+                                {
+                                    if (activeMissiles.ContainsKey(message.Source))
                                     {
-                                        break;
-                                    }
-                                case "ConfirmStatus"://导弹回复状态确认消息，刷新导弹确认时间
+                                        ShowMessage("导弹" + message.Source.ToString() + "确认状态");
+                                    }else
                                     {
-                                        if(activeMissiles.ContainsKey(message.Source))
-                                        {
-                                            activeMissiles[message.Source].TargetScanLife = 12;
-                                            ShowMessage("导弹" + message.Source.ToString() + "确认状态");
-                                            Vector3D.TryParse(data[2], out activeMissiles[message.Source].TargetPos);
-                                        }
-                                        break;
-                                    }
-                                case "LaunchConfirmed"://导弹发送发射消息，检查列表中是否有相同ID的导弹，并新增项目
-                                    {
-                                        if (activeMissiles.ContainsKey(message.Source))
-                                        {
-                                            activeMissiles.Remove(message.Source);
-                                        }
-                                        if (activeMissilesIndex.Contains(message.Source))
-                                        {
-                                            activeMissilesIndex.Remove(message.Source);
-                                        }
-                                        MissileStandard missile = new MissileStandard();
-                                        missile.TargetID = message.Source;
-                                        missile.TargetScanLife = 12;
-                                        missile.type = TargetType.LaunchedMissile;
-                                        int targetIndex = rnd.Next(0, activeTargetsIndex.Count);
-                                        missile.LockedTarget = activeTargetsIndex[targetIndex];
-                                        activeMissiles.Add(message.Source, missile);
                                         activeMissilesIndex.Add(message.Source);
-                                        ShowMessage("导弹" + message.Source.ToString() + "已升空");
-                                        break;
+                                        MissileStandard missile = new MissileStandard();
+                                        activeMissiles.Add(message.Source, missile);
                                     }
-                            }
+                                    Vector3D.TryParse(data[1], out activeMissiles[message.Source].TargetPos);
+                                    long.TryParse(data[2], out activeMissiles[message.Source].LockedTarget);
+                                    break;
+                                }
+                            case "LaunchConfirmed"://导弹发送发射消息，检查列表中是否有相同ID的导弹，并新增项目
+                                {
+                                    MissileStandard missile = new MissileStandard();
+                                    missile.TargetID = message.Source;
+                                    missile.type = TargetType.LaunchedMissile;
+                                    int targetIndex = rnd.Next(0, activeTargetsIndex.Count);
+                                    missile.LockedTarget = activeTargetsIndex[targetIndex];
+                                    activeMissiles.Add(message.Source, missile);
+                                    activeMissilesIndex.Add(message.Source);
+                                    ShowMessage("导弹" + message.Source.ToString() + "已升空");
+                                    break;
+                                }
                         }
-                    }else if(message.Tag.Contains("HostileInfoChannel"))
+                    }
+                    else if(message.Tag.Contains("HostileInfoChannel"))
                     {
-                        if(data[0] == "HostileTarget")
+                        switch (data[0])
                         {
-                            switch(data[1])
-                            {
-                                default:
+                            default:
+                                {
+                                    break;
+                                }
+                            case "UpdateTargetInfo"://接收来自友方舰船发来的敌方消息
+                                {
+                                    string[] targets = data[1].Split(',');
+                                    for (int t = 0; t < targets.Length; t++)
                                     {
-                                        break;
-                                    }
-                                case "UpdateTargetInfo"://接收来自友方舰船发来的敌方消息
-                                    {
-                                        string[] targets = data[2].Split(',');
-                                        for(int t = 0;t<targets.Length;t++)
+                                        if (string.IsNullOrEmpty(targets[t]))
                                         {
-                                            if(string.IsNullOrEmpty(targets[t]))
-                                            {
-                                                break;
-                                            }    
-                                            string[] info = targets[t].Split('/');
-                                            long targetID = long.Parse(info[0]);
-                                            if (!activeTargetsIndex.Contains(targetID))
-                                            {
-                                                activeTargetsIndex.Add(targetID);
-                                            }
-                                            if (!activeTargets.ContainsKey(targetID))
-                                            {
-                                                TargetStandard target = new TargetStandard();
-                                                target.type = TargetType.HostileObject;
-                                                target.TargetID = targetID;
-                                                activeTargets.Add(targetID, target);
-                                            }
-                                            activeTargets[targetID].TargetScanLife = 12;
-                                            Vector3D.TryParse(info[1], out activeTargets[targetID].TargetPos);
-                                            Vector3D.TryParse(info[2], out activeTargets[targetID].TargetVel);
-                                            //activeTargets[targetID].TargetRot = new QuaternionD(float.Parse(info[3]), float.Parse(info[4]), float.Parse(info[5]), float.Parse(info[6]));
+                                            break;
                                         }
-                                        ShowMessage("接收到来自" + message.Source.ToString() + "的敌方数据");
-                                        break;
+                                        string[] info = targets[t].Split('/');
+                                        long targetID = long.Parse(info[0]);
+                                        if (!activeTargetsIndex.Contains(targetID))
+                                        {
+                                            activeTargetsIndex.Add(targetID);
+                                        }
+                                        if (!activeTargets.ContainsKey(targetID))
+                                        {
+                                            TargetStandard target = new TargetStandard();
+                                            target.type = TargetType.HostileObject;
+                                            target.TargetID = targetID;
+                                            activeTargets.Add(targetID, target);
+                                        }
+                                        Vector3D.TryParse(info[1], out activeTargets[targetID].TargetPos);
+                                        Vector3D.TryParse(info[2], out activeTargets[targetID].TargetVel);
+                                        //activeTargets[targetID].TargetRot = new QuaternionD(float.Parse(info[3]), float.Parse(info[4]), float.Parse(info[5]), float.Parse(info[6]));
                                     }
-                            }
+                                    ShowMessage("接收到来自" + message.Source.ToString() + "的敌方数据");
+                                    break;
+                                }
                         }
-                    }else if(message.Tag.Contains("FriendlyScoutChannel"))
+                    }
+                    else if(message.Tag.Contains("FriendlyScoutChannel"))
                     {
-                        if(data[0] == "FriendlyScout")
+                        switch (data[0])
                         {
-                            switch(data[1])
-                            {
-                                case "RegisterScout":
+                            case "RegisterScout":
+                                {
+                                    if (!activeFriendlyIndex.Contains(message.Source))
+                                    {
+                                        activeFriendlyIndex.Add(message.Source);
+                                    }
+                                    if (!activeFriendly.ContainsKey(message.Source))
+                                    {
+                                        TargetStandard target = new TargetStandard();
+                                        target.type = TargetType.FriendlyScout;
+                                        target.TargetID = message.Source;
+                                        activeFriendly.Add(message.Source, target);
+                                    }
+                                    IGC.SendUnicastMessage(message.Source, "FriendlyScoutChannel", "ConfirmedRegister");
+                                    ShowMessage("友方侦察机" + message.Source.ToString() + "已连接");
+                                    break;
+                                }
+                            case "SynchSelfInfo":
+                                {
+                                    if (!activeFriendly.ContainsKey(message.Source))
                                     {
                                         if (!activeFriendlyIndex.Contains(message.Source))
                                         {
@@ -304,73 +256,45 @@ namespace SEScript
                                             target.TargetID = message.Source;
                                             activeFriendly.Add(message.Source, target);
                                         }
-                                        IGC.SendUnicastMessage(message.Source, "FriendlyScoutChannel", "ConfirmedRegister");
-                                        ShowMessage("友方侦察机" + message.Source.ToString() + "已连接");
-                                        break;
                                     }
-                                case "SynchSelfInfo":
-                                    {
-                                        if(activeFriendly.ContainsKey(message.Source))
-                                        {
-
-                                        }else
-                                        {
-                                            if (!activeFriendlyIndex.Contains(message.Source))
-                                            {
-                                                activeFriendlyIndex.Add(message.Source);
-                                            }
-                                            if (!activeFriendly.ContainsKey(message.Source))
-                                            {
-                                                TargetStandard target = new TargetStandard();
-                                                target.type = TargetType.FriendlyScout;
-                                                target.TargetID = message.Source;
-                                                activeFriendly.Add(message.Source, target);
-                                            }
-                                            ShowMessage("友方侦察机" + message.Source.ToString() + "已连接");
-                                        }
-                                        Vector3D.TryParse(data[2], out activeFriendly[message.Source].TargetPos);
-                                        Vector3D.TryParse(data[3], out activeFriendly[message.Source].TargetVel);
-                                        ShowMessage("友方侦察机" + message.Source.ToString() + "同步单位信息");
-                                        break;
-                                    }
-                            }
+                                    Vector3D.TryParse(data[1], out activeFriendly[message.Source].TargetPos);
+                                    Vector3D.TryParse(data[2], out activeFriendly[message.Source].TargetVel);
+                                    ShowMessage("友方侦察机" + message.Source.ToString() + "同步单位信息");
+                                    break;
+                                }
                         }
                         return;
                     }else if(message.Tag.Contains("FriendlyShipChannel"))
                     {
-                        if (data[0] == "FriendlyShip")
+                        switch (data[0])
                         {
-                            switch (data[1])
-                            {
-                                case "RegisterShip":
+                            case "RegisterShip":
+                                {
+                                    if (!activeFriendlyIndex.Contains(message.Source))
                                     {
-                                        if (!activeFriendlyIndex.Contains(message.Source))
-                                        {
-                                            activeFriendlyIndex.Add(message.Source);
-                                        }
-                                        if (!activeFriendly.ContainsKey(message.Source))
-                                        {
-                                            TargetStandard target = new TargetStandard();
-                                            target.type = TargetType.FriendlyShip;
-                                            target.TargetID = message.Source;
-                                            activeFriendly.Add(message.Source, target);
-                                        }
-                                        IGC.SendUnicastMessage(message.Source, "FriendlyShipChannel", "ConfirmedRegister");
-                                        ShowMessage("友方舰船" + message.Source.ToString() + "已连接");
-                                        break;
+                                        activeFriendlyIndex.Add(message.Source);
                                     }
-                                case "SynchSelfInfo":
+                                    if (!activeFriendly.ContainsKey(message.Source))
                                     {
-                                        if (activeFriendly.ContainsKey(message.Source))
-                                        {
-                                            Vector3D.TryParse(data[2], out activeFriendly[message.Source].TargetPos);
-                                            Vector3D.TryParse(data[3], out activeFriendly[message.Source].TargetVel);
-                                            activeFriendly[message.Source].TargetScanLife = 6;
-                                            ShowMessage("友方舰船" + message.Source.ToString() + "同步单位信息");
-                                        }
-                                        break;
+                                        TargetStandard target = new TargetStandard();
+                                        target.type = TargetType.FriendlyShip;
+                                        target.TargetID = message.Source;
+                                        activeFriendly.Add(message.Source, target);
                                     }
-                            }
+                                    IGC.SendUnicastMessage(message.Source, "FriendlyShipChannel", "ConfirmedRegister");
+                                    ShowMessage("友方舰船" + message.Source.ToString() + "已连接");
+                                    break;
+                                }
+                            case "SynchSelfInfo":
+                                {
+                                    if (activeFriendly.ContainsKey(message.Source))
+                                    {
+                                        Vector3D.TryParse(data[1], out activeFriendly[message.Source].TargetPos);
+                                        Vector3D.TryParse(data[2], out activeFriendly[message.Source].TargetVel);
+                                        ShowMessage("友方舰船" + message.Source.ToString() + "同步单位信息");
+                                    }
+                                    break;
+                                }
                         }
                         return;
                     }
@@ -390,7 +314,7 @@ namespace SEScript
 
                 if (activeTargets.Count == 0)
                 {
-                    IGC.SendUnicastMessage(activeMissilesIndex[i], "MissilesChannel", "Missile|StatusIdle");
+                    IGC.SendUnicastMessage(activeMissilesIndex[i], "MissilesChannel", "StatusIdle");
                 }
                 else
                 {
@@ -400,24 +324,31 @@ namespace SEScript
                         activeMissiles[activeMissilesIndex[i]].LockedTarget = activeTargetsIndex[targetIndex];
                     }
 
-                    MissileTargetInfo = activeTargets[activeMissiles[activeMissilesIndex[i]].LockedTarget].TargetPos.ToString() + "|" + activeTargets[activeMissiles[activeMissilesIndex[i]].LockedTarget].TargetVel.ToString();
-                    IGC.SendUnicastMessage(activeMissilesIndex[i], "MissilesChannel", "Missile|SynchTargetInfo|" + MissileTargetInfo);
+                    MissileTargetInfo = activeTargets[activeMissiles[activeMissilesIndex[i]].LockedTarget].TargetPos.ToString() + "|" + activeTargets[activeMissiles[activeMissilesIndex[i]].LockedTarget].TargetVel.ToString() + "|" + activeMissiles[activeMissilesIndex[i]].LockedTarget.ToString();
+                    IGC.SendUnicastMessage(activeMissilesIndex[i], "MissilesChannel", "SynchTargetInfo|" + MissileTargetInfo);
                 }
             }
             //向友方舰船同步信息
             ShowMessage("向友方舰船广播信息");
-            string targetInfo = "FriendlyShip|SynchInfo|";
+            string targetInfo = "SynchInfo|";
             for(int i = 0;i<activeTargetsIndex.Count;i++)
             {
                 targetInfo += activeTargets[activeTargetsIndex[i]].TargetID + "/" + activeTargets[activeTargetsIndex[i]].TargetPos + "/" + activeTargets[activeTargetsIndex[i]].TargetVel + ",";
             }
             IGC.SendBroadcastMessage("FriendlyShipChannel", targetInfo, TransmissionDistance.TransmissionDistanceMax);
         }
+        /// <summary>
+        /// 向己方发送要求回复消息
+        /// </summary>
+        void RequestReply()
+        {
+            IGC.SendBroadcastMessage("LTCCommonChannel", "RequestReply");
+        }
         void ShowMessage(string msg)
         {
             if(MessageBoard != null)
             {
-                if (DisplayMessage.Count >= 10)
+                if (DisplayMessage.Count >= 5)
                 {
                     DisplayMessage.RemoveAt(0);
                 }
@@ -439,11 +370,12 @@ namespace SEScript
         }
         void RemoveItems()
         {
-            activeFriendlyIndex.RemoveAll((x) => itemRemoval.Contains(x));
-            activeMissilesIndex.RemoveAll((x) => itemRemoval.Contains(x));
-            activeTargetsIndex.RemoveAll((x) => itemRemoval.Contains(x));
-            
-            itemRemoval.Clear();
+            //activeFriendly.Clear();
+            activeFriendlyIndex.Clear();
+            //activeMissiles.Clear();
+            activeMissilesIndex.Clear();
+            //activeTargets.Clear();
+            activeTargetsIndex.Clear();
         }
         #region drawRadarMap
         void DrawRadarMap()
@@ -470,7 +402,6 @@ namespace SEScript
         class TargetStandard
         {
             public long TargetID;
-            public int TargetScanLife;
             public Vector3D TargetPos;
             public Vector3D TargetVel;
             public TargetType type;
@@ -486,48 +417,90 @@ namespace SEScript
          * 仅对作为索引的List进行变动，实际储存只增不减
          * 另外，将命令执行改为以时间计数的方式
          * 此处借鉴WHIP大佬的设计，赞美他！
+         * 结果不行，重新设计
         */
-        class CommandProcessor
-        {
-            Queue<LTCCommand> queuedCommands;
-            public void InitProcessor()
-            {
-                queuedCommands = new Queue<LTCCommand>();
-            }
-            public void Update()
-            {
-                double timeElapsed = Runtime.TimeSinceLastRun.TotalSeconds;
+        //class CommandProcessor
+        //{
+        //    Queue<LTCCommand> queuedCommands;
+        //    public void InitProcessor()
+        //    {
+        //        queuedCommands = new Queue<LTCCommand>();
+        //    }
+        //    public void Update()
+        //    {
+        //        double timeElapsed = Runtime.TimeSinceLastRun.TotalSeconds;
 
-                foreach (LTCCommand cmd in queuedCommands)
+        //        foreach (LTCCommand cmd in queuedCommands)
+        //        {
+        //            cmd.ExeCommand(timeElapsed);
+        //        }
+        //    }
+        //    public void QueueAction(Action action,int frequency)
+        //    {
+        //        LTCCommand cmd = new LTCCommand(action, frequency);
+        //        queuedCommands.Enqueue(cmd);
+        //    }
+        //}
+        //class LTCCommand
+        //{
+        //    public Action action;
+        //    readonly double runFrequency = 1;
+        //    double TimeSinceLastRun = 0;
+        //    public LTCCommand(Action _action,int frequency)
+        //    {
+        //        action = _action;
+        //        runFrequency = 1f / frequency;
+        //    }
+        //    public void ExeCommand(double timeElapsed)
+        //    {
+        //        TimeSinceLastRun += timeElapsed;
+        //        if(TimeSinceLastRun >= runFrequency)
+        //        {
+        //            action.Invoke();
+        //            TimeSinceLastRun = 0;
+        //        }
+        //    }
+        //}    
+        class SequencedCommand
+        {
+            int counter = 0;
+            List<SeqSingleCmd> sequencedAction;
+            double timeElapsed = 0;
+            public SequencedCommand()
+            {
+                counter = 0;
+                sequencedAction = new List<SeqSingleCmd>();
+                timeElapsed = 0;
+            }
+            public void Commence(double yield)
+            {
+                if(sequencedAction.Count>0)
                 {
-                    cmd.ExeCommand(timeElapsed);
+                    timeElapsed += yield;
+                    if(timeElapsed >= sequencedAction[counter].yieldTime)
+                    {
+                        sequencedAction[counter].command.Invoke();
+                        counter += 1;
+                        counter = counter >= sequencedAction.Count ? 0 : counter;
+                        timeElapsed = 0;
+                    }
                 }
             }
-            public void QueueAction(Action action,int frequency)
+            public void AddCommand(Action cmd,double yieldTime)
             {
-                LTCCommand cmd = new LTCCommand(action, frequency);
-                queuedCommands.Enqueue(cmd);
+                SeqSingleCmd command = new SeqSingleCmd(cmd, yieldTime);
+                sequencedAction.Add(command);
             }
         }
-        class LTCCommand
+        class SeqSingleCmd
         {
-            public Action action;
-            readonly double runFrequency = 1;
-            double TimeSinceLastRun = 0;
-            public LTCCommand(Action _action,int frequency)
+            public Action command;
+            public double yieldTime;
+            public SeqSingleCmd(Action cmd,double _yield)
             {
-                action = _action;
-                runFrequency = 1f / frequency;
+                command = cmd;
+                yieldTime = _yield;
             }
-            public void ExeCommand(double timeElapsed)
-            {
-                TimeSinceLastRun += timeElapsed;
-                if(TimeSinceLastRun >= runFrequency)
-                {
-                    action.Invoke();
-                    TimeSinceLastRun = 0;
-                }
-            }
-        }    
+        }
     }
 }

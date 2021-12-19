@@ -39,18 +39,18 @@ namespace SEScript
             }
             SynchTime += 1;
             ProcessMessages();
-            if (SynchTime > 6)
-            {
-                if(ServerAddress != 0)
-                {
-                    SynchInfoToServer();
-                }else
-                {
-                    IGC.SendBroadcastMessage("FriendlyScoutChannel0", "FriendlyScout|RegisterScout", TransmissionDistance.TransmissionDistanceMax);
-                }
-                SynchTime = 0;
-            }
-            SynchHostileInfoToServer();
+            //if (SynchTime > 6)
+            //{
+            //    if(ServerAddress != 0)
+            //    {
+            //        SynchInfoToServer();
+            //    }else
+            //    {
+            //        IGC.SendBroadcastMessage("FriendlyScoutChannel0", "FriendlyScout|RegisterScout", TransmissionDistance.TransmissionDistanceMax);
+            //    }
+            //    SynchTime = 0;
+            //}
+            //SynchHostileInfoToServer();
             Echo(ServerAddress.ToString());
             Echo("Synch time: " + SynchTime.ToString());
             Echo("Sefl check in: " + selfCheckTime.ToString());
@@ -87,15 +87,12 @@ namespace SEScript
         }
         void InitSystem()
         {
-            IGC.SendBroadcastMessage("FriendlyScoutChannel", "FriendlyScout|RegisterScout", TransmissionDistance.TransmissionDistanceMax);
+            IGC.SendBroadcastMessage("FriendlyScoutChannel", "RegisterScout", TransmissionDistance.TransmissionDistanceMax);
             detectedTargets = new List<MyDetectedEntityInfo>();
             rnd = new Random((int)Me.EntityId);
             channels = new List<IMyBroadcastListener>();
-            for(int i = 0;i<5;i++)
-            {
-                IMyBroadcastListener channel = IGC.RegisterBroadcastListener("FriendlyScoutChannel" + i.ToString());
-                channels.Add(channel);
-            }
+            IMyBroadcastListener commonChannel = IGC.RegisterBroadcastListener("LTCCommonChannel");
+            channels.Add(commonChannel);
             unicastChannel = IGC.UnicastListener;
             CheckReady = true;
         }
@@ -105,7 +102,7 @@ namespace SEScript
             for(int i = 0;i<3;i++)
             {
                 int index = rnd.Next(0, 5);
-                IGC.SendBroadcastMessage("FriendlyScoutChannel" + index.ToString(), "FriendlyScout|SynchSelfInfo|" + Me.CubeGrid.GetPosition().ToString("F3") + "|" + controller.GetShipVelocities().LinearVelocity.ToString("F3"),TransmissionDistance.TransmissionDistanceMax);
+                IGC.SendBroadcastMessage("FriendlyScoutChannel" + index.ToString(), "SynchSelfInfo|" + Me.CubeGrid.GetPosition().ToString("F3") + "|" + controller.GetShipVelocities().LinearVelocity.ToString("F3"),TransmissionDistance.TransmissionDistanceMax);
             }
         }
         void SynchHostileInfoToServer()
@@ -133,7 +130,7 @@ namespace SEScript
                     for (int i = 0; i < 3; i++)
                     {
                         int index = rnd.Next(0, 10);
-                        IGC.SendBroadcastMessage("HostileInfoChannel" + index.ToString(), "HostileTarget|UpdateTargetInfo|" + targetInfo, TransmissionDistance.TransmissionDistanceMax);
+                        IGC.SendBroadcastMessage("HostileInfoChannel" + index.ToString(), "UpdateTargetInfo|" + targetInfo, TransmissionDistance.TransmissionDistanceMax);
                     }
                     SynchTargetTime = 0;
                 }
@@ -147,7 +144,15 @@ namespace SEScript
         {
             for(int i = 0;i<channels.Count;i++)
             {
-
+                if(channels[i].HasPendingMessage)
+                {
+                    MyIGCMessage msg = channels[i].AcceptMessage();
+                    if(msg.Data.ToString() == "RequestReply")
+                    {
+                        SynchInfoToServer();
+                        SynchHostileInfoToServer();
+                    }
+                }
             }
             if(unicastChannel.HasPendingMessage)
             {
