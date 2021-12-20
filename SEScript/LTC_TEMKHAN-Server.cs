@@ -32,7 +32,7 @@ namespace SEScript
         IMyUnicastListener uniListener;
         List<IMyBroadcastListener> channelListeners;
         Random rnd;
-        List<string> DisplayMessage;
+        Queue<string> DisplayMessage;
         IMyTextSurface MessageBoard;
         IMyTextPanel Radar;
         CurrentStatus curStatus = CurrentStatus.Offline;
@@ -92,6 +92,7 @@ namespace SEScript
             activeFriendly = new Dictionary<long, TargetStandard>();
             itemRemoval = new List<long>();
             uniListener = IGC.UnicastListener;
+            uniListener.SetMessageCallback();
             channelListeners = new List<IMyBroadcastListener>();
             //为导弹分配10个频道，每次向导弹发送消息以及导弹发送消息均采用随机3个频道以避免信息丢失
             for(int i = 0;i<10;i++)
@@ -120,7 +121,7 @@ namespace SEScript
                 channelListeners.Add(channel);
             }
             rnd = new Random((int)Me.EntityId);
-            DisplayMessage = new List<string>();
+            DisplayMessage = new Queue<string>();
             itemRemoval = new List<long>();
             ShowMessage("System online");
 
@@ -350,9 +351,9 @@ namespace SEScript
             {
                 if (DisplayMessage.Count >= 5)
                 {
-                    DisplayMessage.RemoveAt(0);
+                    DisplayMessage.Dequeue();
                 }
-                DisplayMessage.Add(msg);                
+                DisplayMessage.Enqueue(msg);                
             }
         }
         void DisplayMessages()
@@ -362,9 +363,9 @@ namespace SEScript
             info += "已联网的友方单位：" + activeFriendlyIndex.Count.ToString() + "\r\n";
             info += "已发现的敌方目标：" + activeTargetsIndex.Count.ToString() + "\r\n";
             info += "=====================\r\n";
-            for (int i = 0; i < DisplayMessage.Count; i++)
+            foreach (var item in DisplayMessage)
             {
-                info += DisplayMessage[i] + "\r\n";
+                info += item + "\r\n";
             }
             MessageBoard.WriteText(info);
         }
@@ -461,6 +462,10 @@ namespace SEScript
         //        }
         //    }
         //}    
+        /// <summary>
+        /// 序列执行命令
+        /// 按照顺序和间隔时间执行序列中的命令，以获得更多的缓冲时间
+        /// </summary>
         class SequencedCommand
         {
             int counter = 0;
