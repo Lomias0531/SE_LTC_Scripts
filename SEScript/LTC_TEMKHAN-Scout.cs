@@ -13,18 +13,21 @@ namespace SEScript
         bool CheckReady = false;
         long ServerAddress = 0;
         int selfCheckTime = 0;
-        int SynchTime = 0;
         int SynchTargetTime = 0;
         IMyShipController controller;
         Random rnd;
         List<IMyBroadcastListener> channels;
         IMyUnicastListener unicastChannel;
+
+        bool enableCamScan = false;
+        List<IMyCameraBlock> camLens;
+        MyDetectedEntityInfo camLock;
         Program()
         {
-            Runtime.UpdateFrequency = UpdateFrequency.Update10;
+            Runtime.UpdateFrequency = UpdateFrequency.Update1;
         }
 
-        void Main()
+        void Main(string arg)
         {
             if(!CheckReady)
             {
@@ -32,27 +35,15 @@ namespace SEScript
                 return;
             }
             selfCheckTime += 1;
-            if(selfCheckTime > 12)
+            if(selfCheckTime > 120)
             {
                 CheckComponents();
                 selfCheckTime = 0;
             }
-            SynchTime += 1;
-            ProcessMessages();
-            //if (SynchTime > 6)
-            //{
-            //    if(ServerAddress != 0)
-            //    {
-            //        SynchInfoToServer();
-            //    }else
-            //    {
-            //        IGC.SendBroadcastMessage("FriendlyScoutChannel0", "FriendlyScout|RegisterScout", TransmissionDistance.TransmissionDistanceMax);
-            //    }
-            //    SynchTime = 0;
-            //}
-            //SynchHostileInfoToServer();
+            AcquireCamTarget();
+            ProcessMessages(arg);
+
             Echo(ServerAddress.ToString());
-            Echo("Synch time: " + SynchTime.ToString());
             Echo("Sefl check in: " + selfCheckTime.ToString());
             Echo(detectedTargets.Count.ToString());
         }
@@ -83,6 +74,15 @@ namespace SEScript
                 return;
             }
             controller = controllers[0];
+            camLens = new List<IMyCameraBlock>();
+            GridTerminalSystem.GetBlocksOfType(camLens);
+            if(camLens.Count>0)
+            {
+                foreach (var cam in camLens)
+                {
+                    cam.EnableRaycast = true;
+                }
+            }
             InitSystem();
         }
         void InitSystem()
@@ -92,9 +92,25 @@ namespace SEScript
             rnd = new Random((int)Me.EntityId);
             channels = new List<IMyBroadcastListener>();
             IMyBroadcastListener commonChannel = IGC.RegisterBroadcastListener("LTCCommonChannel");
+            commonChannel.SetMessageCallback("LTCCommonChannel");
             channels.Add(commonChannel);
             unicastChannel = IGC.UnicastListener;
             CheckReady = true;
+        }
+        void AcquireCamTarget()
+        {
+            if(enableCamScan)
+            {
+                if (camLens.Count == 0) return;
+                for (int i = 0; i < camLens.Count; i++)
+                {
+                    if (camLens[i].CanScan(4000))
+                    {
+                        camLock = camLens[i].Raycast(4000);
+                        break;
+                    }
+                }
+            }
         }
         void SynchInfoToServer()
         {
@@ -114,6 +130,10 @@ namespace SEScript
                 {
                     detectedTargets.Add(autoWeapons[i].GetTargetedEntity());
                 }
+            }
+            if(!camLock.IsEmpty())
+            {
+                detectedTargets.Add(camLock);
             }
             if(detectedTargets.Count > 0)
             {
@@ -140,7 +160,7 @@ namespace SEScript
                 SynchTargetTime = 6;
             }
         }
-        void ProcessMessages()
+        void ProcessMessages(string mainArg)
         {
             for(int i = 0;i<channels.Count;i++)
             {
@@ -161,6 +181,14 @@ namespace SEScript
                 {
                     ServerAddress = msg.Source;
                 }
+            }
+            switch(mainArg)
+            {
+                case "TriggerCamScan":
+                    {
+                        enableCamScan = !enableCamScan;
+                        break;
+                    }
             }
         }
     }

@@ -127,7 +127,7 @@ namespace SEScript
 
             //消息同步命令序列
             SynchInfoCommands = new SequencedCommand();
-            SynchInfoCommands.AddCommand(RemoveItems,0);//清空字典
+            SynchInfoCommands.AddCommand(RemoveItems,0.2);//清空字典
             SynchInfoCommands.AddCommand(RequestReply,0.1);//要求回复
             SynchInfoCommands.AddCommand(SynchInfo,0.5);//返回消息
             SynchInfoCommands.AddCommand(DisplayMessages,0.1);//显示信息
