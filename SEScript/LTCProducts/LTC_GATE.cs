@@ -61,6 +61,7 @@ namespace SEScript.LTCProducts
                 return new Vector3D(x, y, z);
             }
         }
+        List<LTCGyroControl> gyroControls;
 
         enum FlightStatus
         {
@@ -87,6 +88,7 @@ namespace SEScript.LTCProducts
                     GATEControl();
                     break;
             }
+            GATERotate();
         }
         void CheckComponents()
         {
@@ -113,7 +115,12 @@ namespace SEScript.LTCProducts
         }
         void InitSystem()
         {
-
+            gyroControls = new List<LTCGyroControl>();
+            foreach (var item in GyroScopes)
+            {
+                LTCGyroControl gyro = new LTCGyroControl(item, LTCShipControl[0]);
+                gyroControls.Add(gyro);
+            }
             CheckReady = true;
         }
         void CheckFlightStatus()
@@ -131,7 +138,6 @@ namespace SEScript.LTCProducts
         {
             GATEAutoBreak();
             GATEAccelerate();
-            GATERotate();
         }
         void GATEAutoBreak()
         {
@@ -166,34 +172,15 @@ namespace SEScript.LTCProducts
         }
         void GATERotate()
         {
-            if(controlRot.X>0)
+            foreach (var gyro in gyroControls)
             {
-
-            }
-            if(controlRot.X<0)
-            {
-
-            }
-            if(controlRot.Y>0)
-            {
-
-            }
-            if(controlRot.Z<0)
-            {
-
-            }
-            if(controlRot.Z>0)
-            {
-
-            }
-            if(controlRot.Z<0)
-            {
-
+                gyro.Rotate(controlRot);
             }
         }
         #region 引擎控制
         void GoForward(bool isOn)
         {
+            if (Forward.Count <= 0) return;
             foreach (var item in Forward)
             {
                 if (isOn)
@@ -204,6 +191,7 @@ namespace SEScript.LTCProducts
         }
         void GoBackward(bool isOn)
         {
+            if (Backward.Count <= 0) return;
             foreach (var item in Backward)
             {
                 if (isOn)
@@ -214,6 +202,7 @@ namespace SEScript.LTCProducts
         }
         void GoLeft(bool isOn)
         {
+            if (Leftward.Count <= 0) return;
             foreach (var item in Leftward)
             {
                 if (isOn)
@@ -224,6 +213,7 @@ namespace SEScript.LTCProducts
         }
         void GoRight(bool isOn)
         {
+            if (Rightward.Count <= 0) return;
             foreach (var item in Rightward)
             {
                 if (isOn)
@@ -234,6 +224,7 @@ namespace SEScript.LTCProducts
         }
         void GoUp(bool isOn)
         {
+            if (Upward.Count <= 0) return;
             foreach (var item in Upward)
             {
                 if (isOn)
@@ -244,12 +235,102 @@ namespace SEScript.LTCProducts
         }
         void GoDown(bool isOn)
         {
+            if (Downward.Count <= 0) return;
             foreach (var item in Downward)
             {
                 if (isOn)
                     item.Extend();
                 else
                     item.Retract();
+            }
+        }
+        #endregion
+        #region 陀螺仪控制
+        /// <summary>
+        /// 将控制器旋转控制转化为陀螺仪自身旋转控制
+        /// </summary>
+        public class LTCGyroControl
+        {
+            public IMyGyro thisGyro;
+            readonly Base6Directions.Direction UpFacing;
+            readonly Base6Directions.Direction LeftFacing;
+            readonly Base6Directions.Direction ForwardFacing;
+
+            public LTCGyroControl(IMyGyro gyro,IMyShipController controller)
+            {
+                thisGyro = gyro;
+                UpFacing = gyro.WorldMatrix.GetClosestDirection(controller.WorldMatrix.Up);
+                LeftFacing = gyro.WorldMatrix.GetClosestDirection(controller.WorldMatrix.Left);
+                ForwardFacing = gyro.WorldMatrix.GetClosestDirection(controller.WorldMatrix.Forward);
+                thisGyro.GyroOverride = true;
+            }
+            public void Rotate(Vector3 rotIndicator)
+            {
+                switch (LeftFacing)
+                {
+                    case Base6Directions.Direction.Up:
+                        thisGyro.Yaw = rotIndicator.X;
+                        break;
+                    case Base6Directions.Direction.Down:
+                        thisGyro.Yaw = rotIndicator.X * -1;
+                        break;
+                    case Base6Directions.Direction.Left:
+                        thisGyro.Pitch = rotIndicator.X;
+                        break;
+                    case Base6Directions.Direction.Right:
+                        thisGyro.Pitch = rotIndicator.X * -1;
+                        break;
+                    case Base6Directions.Direction.Forward:
+                        thisGyro.Roll = rotIndicator.X;
+                        break;
+                    case Base6Directions.Direction.Backward:
+                        thisGyro.Roll = rotIndicator.X * -1;
+                        break;
+                }
+
+                switch (UpFacing)
+                {
+                    case Base6Directions.Direction.Up:
+                        thisGyro.Yaw = rotIndicator.Y;
+                        break;
+                    case Base6Directions.Direction.Down:
+                        thisGyro.Yaw = rotIndicator.Y * -1;
+                        break;
+                    case Base6Directions.Direction.Left:
+                        thisGyro.Pitch = rotIndicator.Y;
+                        break;
+                    case Base6Directions.Direction.Right:
+                        thisGyro.Pitch = rotIndicator.Y * -1;
+                        break;
+                    case Base6Directions.Direction.Forward:
+                        thisGyro.Roll = rotIndicator.Y;
+                        break;
+                    case Base6Directions.Direction.Backward:
+                        thisGyro.Roll = rotIndicator.Y * -1;
+                        break;
+                }
+                
+                switch(ForwardFacing)
+                {
+                    case Base6Directions.Direction.Up:
+                        thisGyro.Yaw = rotIndicator.Z;
+                        break;
+                    case Base6Directions.Direction.Down:
+                        thisGyro.Yaw = rotIndicator.Z * -1;
+                        break;
+                    case Base6Directions.Direction.Left:
+                        thisGyro.Pitch = rotIndicator.Z;
+                        break;
+                    case Base6Directions.Direction.Right:
+                        thisGyro.Pitch = rotIndicator.Z * -1;
+                        break;
+                    case Base6Directions.Direction.Forward:
+                        thisGyro.Roll = rotIndicator.Z;
+                        break;
+                    case Base6Directions.Direction.Backward:
+                        thisGyro.Roll = rotIndicator.Z * -1;
+                        break;
+                }
             }
         }
         #endregion
