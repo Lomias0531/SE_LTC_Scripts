@@ -98,12 +98,7 @@ namespace SEScript.LTCProducts
                 Echo("找不到陀螺仪");
                 return;
             }
-            GridTerminalSystem.GetBlocksOfType(Forward, x => x.CustomName == "Forward");
-            GridTerminalSystem.GetBlocksOfType(Backward, x => x.CustomName == "Backward");
-            GridTerminalSystem.GetBlocksOfType(Leftward, x => x.CustomName == "Leftward");
-            GridTerminalSystem.GetBlocksOfType(Rightward, x => x.CustomName == "Righrward");
-            GridTerminalSystem.GetBlocksOfType(Upward, x => x.CustomName == "Upward");
-            GridTerminalSystem.GetBlocksOfType(Downward, x => x.CustomName == "Downward");
+
 
             GridTerminalSystem.GetBlocksOfType(LTCShipControl);
             if (LTCShipControl.Count == 0)
@@ -111,6 +106,34 @@ namespace SEScript.LTCProducts
                 Echo("没有船只控制器");
                 return;
             }
+
+            List<IMyPistonBase> pis = new List<IMyPistonBase>();
+            GridTerminalSystem.GetBlocksOfType(pis);
+            foreach (var item in pis)
+            {
+                switch(item.WorldMatrix.GetClosestDirection(LTCShipControl[0].WorldMatrix.Forward))
+                {
+                    case Base6Directions.Direction.Forward:
+                        Forward.Add(item);
+                        break;
+                    case Base6Directions.Direction.Backward:
+                        Backward.Add(item);
+                        break;
+                    case Base6Directions.Direction.Up:
+                        Upward.Add(item);
+                        break;
+                    case Base6Directions.Direction.Down:
+                        Downward.Add(item);
+                        break;
+                    case Base6Directions.Direction.Left:
+                        Leftward.Add(item);
+                        break;
+                    case Base6Directions.Direction.Right:
+                        Rightward.Add(item);
+                        break;
+                }
+            }
+
             InitSystem();
         }
         void InitSystem()
